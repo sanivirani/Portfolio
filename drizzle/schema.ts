@@ -1,17 +1,7 @@
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
-/**
- * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
- */
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
@@ -22,7 +12,46 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
+export const portfolioSettings = mysqlTable("portfolioSettings", {
+  key: varchar("key", { length: 64 }).primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const portfolioMedia = mysqlTable("portfolioMedia", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  key: varchar("key", { length: 512 }).notNull().unique(),
+  url: varchar("url", { length: 1024 }).notNull(),
+  mimeType: varchar("mimeType", { length: 120 }).notNull(),
+  altText: varchar("altText", { length: 255 }).notNull().default(""),
+  caption: text("caption"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const caseStudies = mysqlTable("caseStudies", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 160 }).notNull().unique(),
+  title: varchar("title", { length: 160 }).notNull(),
+  label: varchar("label", { length: 255 }).notNull(),
+  industry: varchar("industry", { length: 160 }).notNull(),
+  role: text("role"),
+  description: text("description").notNull(),
+  focus: varchar("focus", { length: 255 }).notNull(),
+  tone: mysqlEnum("tone", ["violet", "lime", "sand"]).default("violet").notNull(),
+  services: text("services").notNull(),
+  technologies: text("technologies").notNull(),
+  metrics: text("metrics").notNull(),
+  mediaId: int("mediaId"),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
-
-// TODO: Add your tables here
+export type PortfolioSetting = typeof portfolioSettings.$inferSelect;
+export type PortfolioMedia = typeof portfolioMedia.$inferSelect;
+export type CaseStudy = typeof caseStudies.$inferSelect;

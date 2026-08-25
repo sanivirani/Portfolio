@@ -11,7 +11,8 @@ import {
   Target,
   X,
 } from "lucide-react";
-import { portfolioContent } from "@/content/portfolio";
+import { defaultSiteSettings, portfolioContent } from "@/content/portfolio";
+import { trpc } from "@/lib/trpc";
 
 const navItems = [
   ["Expertise", "#expertise"],
@@ -25,6 +26,26 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeWork, setActiveWork] = useState("All work");
   const [headerElevated, setHeaderElevated] = useState(false);
+  const { data: managedSite } = trpc.portfolio.public.site.useQuery();
+  const content = managedSite?.content ?? {
+    ...portfolioContent,
+    process: portfolioContent.process.map(([number, title, description]) => ({ number, title, description })),
+  };
+  const settings = managedSite?.settings ?? defaultSiteSettings;
+  const publicWork = managedSite?.caseStudies.length
+    ? managedSite.caseStudies.map((item) => ({
+        title: item.title,
+        label: item.label,
+        industry: item.industry,
+        scope: item.services,
+        summary: item.description,
+        focus: item.focus,
+        tone: item.tone,
+        role: item.role,
+        metrics: item.metrics,
+        mediaUrl: item.mediaUrl,
+      }))
+    : portfolioContent.work.map((item) => ({ ...item, role: "", metrics: [] as Array<{ label: string; value: string; description: string }>, mediaUrl: null }));
 
   useEffect(() => {
     const onScroll = () => setHeaderElevated(window.scrollY > 20);
@@ -35,8 +56,8 @@ export default function Home() {
 
   const visibleWork =
     activeWork === "All work"
-      ? portfolioContent.work
-      : portfolioContent.work.filter((item) => item.scope.includes(activeWork));
+      ? publicWork
+      : publicWork.filter((item) => item.scope.includes(activeWork));
 
   return (
     <div className="site-shell">
@@ -46,9 +67,9 @@ export default function Home() {
 
       <header className={`site-header ${headerElevated ? "site-header--elevated" : ""}`}>
         <div className="site-header__inner">
-          <a className="brand" href="#top" aria-label="Sani Virani home">
+          <a className="brand" href="#top" aria-label={`${content.name} home`}>
             <span className="brand__mark">SV</span>
-            <span className="brand__name">Sani Virani</span>
+            <span className="brand__name">{content.name}</span>
           </a>
 
           <nav className="desktop-nav" aria-label="Main navigation">
@@ -97,9 +118,9 @@ export default function Home() {
               <p className="eyebrow eyebrow--light">
                 <span /> Digital growth, connected
               </p>
-              <p className="hero__name">Hi, I’m Sani Virani.</p>
-              <h1>{portfolioContent.hero}</h1>
-              <p className="hero__description">{portfolioContent.supportingLine}</p>
+              <p className="hero__name">Hi, I’m {content.name}.</p>
+              <h1>{content.hero}</h1>
+              <p className="hero__description">{content.supportingLine}</p>
               <div className="hero__actions">
                 <a className="button button--lime" href="#work">
                   Explore selected work <ArrowDownRight size={18} aria-hidden="true" />
@@ -173,15 +194,15 @@ export default function Home() {
             <div className="section-heading">
               <div>
                 <p className="eyebrow"><span /> The growth loop</p>
-                <h2>One partner across the work that moves ecommerce forward.</h2>
+                <h2>{content.sections.expertiseHeading}</h2>
               </div>
               <p>
-                The strongest digital experiences are not isolated pages or campaigns. They are systems where each decision informs the next.
+                {content.sections.expertiseIntro}
               </p>
             </div>
 
             <div className="pillar-grid">
-              {portfolioContent.pillars.map((pillar, index) => (
+              {content.pillars.map((pillar, index) => (
                 <article className="pillar-card" key={pillar.title}>
                   <div className="pillar-card__top">
                     <span>0{index + 1}</span>
@@ -206,7 +227,7 @@ export default function Home() {
           <div className="layout-container statement-section__inner">
             <div className="statement-mark" aria-hidden="true">↗</div>
             <p>
-              “The goal isn’t simply to make a store look good. It’s to make every point in the customer journey work together.”
+              “{content.sections.statement}”
             </p>
           </div>
         </section>
@@ -216,10 +237,10 @@ export default function Home() {
             <div className="section-heading section-heading--work">
               <div>
                 <p className="eyebrow"><span /> Selected work</p>
-                <h2>Projects built with the entire customer journey in view.</h2>
+                <h2>{content.sections.workHeading}</h2>
               </div>
               <p>
-                A selection of engagements across jewelry, ecommerce, development, and growth execution. Every detail shown is grounded in the supplied portfolio record.
+                {content.sections.workIntro}
               </p>
             </div>
             <div className="work-filters" aria-label="Filter selected work">
@@ -238,17 +259,23 @@ export default function Home() {
             <div className="work-grid">
               {visibleWork.map((item, index) => (
                 <article className={`work-card work-card--${item.tone}`} key={item.title}>
-                  <div className="work-card__visual" aria-hidden="true">
+                  <div className="work-card__visual">
                     <span className="work-card__index">0{index + 1}</span>
-                    {item.tone === "violet" && <div className="jewel-orbit"><i /><b /></div>}
-                    {item.tone === "lime" && <div className="browser-slice"><span /><span /><span /></div>}
-                    {item.tone === "sand" && <div className="campaign-pieces"><i /><i /><i /><i /></div>}
+                    {item.mediaUrl ? <img src={item.mediaUrl} alt={`${item.title} project visual`} className="work-card__image" /> : <>
+                      {item.tone === "violet" && <div className="jewel-orbit" aria-hidden="true"><i /><b /></div>}
+                      {item.tone === "lime" && <div className="browser-slice" aria-hidden="true"><span /><span /><span /></div>}
+                      {item.tone === "sand" && <div className="campaign-pieces" aria-hidden="true"><i /><i /><i /><i /></div>}
+                    </>}
                   </div>
                   <div className="work-card__content">
                     <div className="work-card__meta"><span>{item.label}</span><ArrowUpRight size={18} aria-hidden="true" /></div>
                     <h3>{item.title}</h3>
                     <p>{item.summary}</p>
+                    {item.role && <p className="work-card__role"><span>Role</span>{item.role}</p>}
                     <div className="work-card__detail"><span>Focus</span><strong>{item.focus}</strong></div>
+                    {item.metrics.length > 0 && <div className="work-card__metrics" aria-label={`${item.title} verified metrics`}>
+                      {item.metrics.slice(0, 2).map((metric) => <div key={`${metric.label}-${metric.value}`}><span>{metric.label}</span><strong>{metric.value}</strong>{metric.description && <small>{metric.description}</small>}</div>)}
+                    </div>}
                     <div className="tag-list tag-list--dark">
                       {item.scope.map((tag) => <span key={tag}>{tag}</span>)}
                     </div>
@@ -267,16 +294,16 @@ export default function Home() {
           <div className="layout-container journey__layout">
             <div className="journey__sticky">
               <p className="eyebrow"><span /> Professional journey</p>
-              <h2>Experience built across the full ecommerce ecosystem.</h2>
+              <h2>{content.sections.journeyHeading}</h2>
               <p>
-                From Shopify foundations to cross-functional campaign and analytics work, Sani’s path has been shaped by understanding how the parts relate.
+                {content.sections.journeyIntro}
               </p>
               <div className="stack-cloud" aria-label="Technology stack">
-                {portfolioContent.stack.map((item) => <span key={item}>{item}</span>)}
+                {content.stack.map((item) => <span key={item}>{item}</span>)}
               </div>
             </div>
             <ol className="journey-list">
-              {portfolioContent.journey.map((item) => (
+              {content.journey.map((item) => (
                 <li key={item.company}>
                   <span className="journey-list__dot" aria-hidden="true" />
                   <div className="journey-list__period">{item.period}</div>
@@ -292,14 +319,14 @@ export default function Home() {
           <div className="layout-container">
             <div className="approach__top">
               <p className="eyebrow eyebrow--light"><span /> Working approach</p>
-              <h2>Clear priorities, well-made execution, and a feedback loop that keeps learning.</h2>
+              <h2>{content.sections.approachHeading}</h2>
             </div>
             <div className="process-grid">
-              {portfolioContent.process.map(([number, title, description]) => (
-                <article key={number}>
-                  <span>{number}</span>
-                  <h3>{title}</h3>
-                  <p>{description}</p>
+              {content.process.map((step) => (
+                <article key={step.number}>
+                  <span>{step.number}</span>
+                  <h3>{step.title}</h3>
+                  <p>{step.description}</p>
                 </article>
               ))}
             </div>
@@ -310,18 +337,20 @@ export default function Home() {
           <div className="layout-container contact__layout">
             <div>
               <p className="eyebrow"><span /> Start a conversation</p>
-              <h2>Have a store, campaign, or growth question worth exploring?</h2>
+              <h2>{content.sections.contactHeading}</h2>
             </div>
             <div className="contact__details">
-              <p>
-                Share a concise brief, the business context, and what you want to improve. Direct contact details and social profiles can be connected here before launch.
-              </p>
-              <a className="button button--dark" href="mailto:?subject=Project%20enquiry%20for%20Sani%20Virani">
-                Prepare a project enquiry <ArrowUpRight size={18} aria-hidden="true" />
+              <p>{settings.contactIntro}</p>
+              <a className="button button--dark" href={settings.contactEmail ? `mailto:${settings.contactEmail}?subject=Project%20enquiry%20for%20${encodeURIComponent(content.name)}` : "/admin/settings"}>
+                {settings.contactEmail ? "Prepare a project enquiry" : "Add your email in CMS"} <ArrowUpRight size={18} aria-hidden="true" />
               </a>
-              <div className="social-placeholder" aria-label="Social profile links to connect before launch">
+              <div className="social-placeholder" aria-label="Social profiles">
                 <span>Social profiles</span>
-                <span className="social-placeholder__items">LinkedIn <i /> Instagram <i /> X</span>
+                <span className="social-placeholder__items">
+                  {settings.linkedinUrl && <a href={settings.linkedinUrl} target="_blank" rel="noreferrer">LinkedIn</a>}
+                  {settings.linkedinUrl && settings.githubUrl && <i />}
+                  {settings.githubUrl && <a href={settings.githubUrl} target="_blank" rel="noreferrer">GitHub</a>}
+                </span>
               </div>
             </div>
           </div>
@@ -330,9 +359,9 @@ export default function Home() {
 
       <footer className="site-footer">
         <div className="layout-container site-footer__inner">
-          <span>© {new Date().getFullYear()} Sani Virani</span>
+          <span>© {new Date().getFullYear()} {content.name}</span>
           <span>Shopify · Performance · Growth</span>
-          <a href="#top">Back to top <ArrowUpRight size={14} aria-hidden="true" /></a>
+          <span className="site-footer__links"><a href="/admin">Content studio</a><a href="#top">Back to top <ArrowUpRight size={14} aria-hidden="true" /></a></span>
         </div>
       </footer>
     </div>

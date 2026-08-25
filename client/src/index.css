@@ -1,6 +1,23 @@
 @import "tailwindcss";
 
 :root {
+  --background: oklch(0.96 0.01 110);
+  --foreground: oklch(0.15 0.015 130);
+  --card: oklch(0.98 0.01 110);
+  --card-foreground: oklch(0.15 0.015 130);
+  --popover: oklch(0.98 0.01 110);
+  --popover-foreground: oklch(0.15 0.015 130);
+  --primary: oklch(0.82 0.20 118);
+  --primary-foreground: oklch(0.16 0.015 130);
+  --secondary: oklch(0.90 0.02 120);
+  --secondary-foreground: oklch(0.16 0.015 130);
+  --muted-foreground: oklch(0.45 0.02 130);
+  --accent: oklch(0.90 0.02 120);
+  --accent-foreground: oklch(0.16 0.015 130);
+  --destructive: oklch(0.60 0.22 25);
+  --border: oklch(0.82 0.02 120);
+  --input: oklch(0.82 0.02 120);
+  --ring: oklch(0.82 0.20 118);
   --ink: #101512;
   --ink-soft: #283129;
   --paper: #f3f3ed;
@@ -14,6 +31,25 @@
   --sans: "Manrope", sans-serif;
   --display: "Syne", sans-serif;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+.dark {
+  --background: oklch(0.14 0.015 130);
+  --foreground: oklch(0.96 0.01 110);
+  --card: oklch(0.17 0.018 130);
+  --card-foreground: oklch(0.96 0.01 110);
+  --popover: oklch(0.17 0.018 130);
+  --popover-foreground: oklch(0.96 0.01 110);
+  --primary: oklch(0.82 0.20 118);
+  --primary-foreground: oklch(0.16 0.015 130);
+  --secondary: oklch(0.23 0.02 130);
+  --secondary-foreground: oklch(0.96 0.01 110);
+  --muted-foreground: oklch(0.70 0.02 130);
+  --accent: oklch(0.23 0.02 130);
+  --accent-foreground: oklch(0.96 0.01 110);
+  --destructive: oklch(0.66 0.20 25);
+  --border: oklch(0.29 0.02 130);
+  --input: oklch(0.29 0.02 130);
+  --ring: oklch(0.82 0.20 118);
 }
 
 * { box-sizing: border-box; }
@@ -125,6 +161,7 @@ h1 { max-width: 690px; margin: 0; font-size: clamp(48px, 5.8vw, 82px); line-heig
 .work-card { background: #f8f8f3; min-width: 0; transition: transform 180ms var(--ease-out), box-shadow 180ms var(--ease-out); }
 .work-card:hover { transform: translateY(-5px); box-shadow: 0 18px 28px rgba(16,21,18,.11); }
 .work-card__visual { position: relative; height: 257px; overflow: hidden; }
+.work-card__image { width: 100%; height: 100%; object-fit: cover; }
 .work-card--violet .work-card__visual { background: var(--violet); }
 .work-card--lime .work-card__visual { background: var(--lime); }
 .work-card--sand .work-card__visual { background: var(--sand); }
@@ -151,9 +188,15 @@ h1 { max-width: 690px; margin: 0; font-size: clamp(48px, 5.8vw, 82px); line-heig
 .work-card__meta { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font: 500 10px/1.4 var(--mono); text-transform: uppercase; letter-spacing: .07em; }
 .work-card__content h3 { margin: 30px 0 10px; font-size: 30px; line-height: 1; }
 .work-card__content > p { min-height: 75px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.62; }
+.work-card__role { display: grid; gap: 4px; margin: 15px 0 0 !important; min-height: auto !important; font-size: 12px !important; }
+.work-card__role span { color: var(--muted); font: 500 9px var(--mono); text-transform: uppercase; letter-spacing: .1em; }
 .work-card__detail { display: grid; gap: 4px; margin: 22px 0 15px; padding-top: 15px; border-top: 1px solid var(--line); }
 .work-card__detail span { color: var(--muted); font: 500 9px var(--mono); text-transform: uppercase; letter-spacing: .1em; }
 .work-card__detail strong { font-size: 12px; line-height: 1.4; }
+.work-card__metrics { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 6px; margin: 0 0 15px; }
+.work-card__metrics > div { display: grid; gap: 3px; padding: 8px; background: var(--paper-deep); }
+.work-card__metrics span, .work-card__metrics small { color: var(--muted); font: 500 8px/1.35 var(--mono); text-transform: uppercase; letter-spacing: .05em; }
+.work-card__metrics strong { font: 700 17px/1 var(--display); letter-spacing: -.05em; }
 .tag-list--dark span { border-color: var(--line); color: var(--muted); }
 .empty-work { grid-column: 1/-1; padding: 40px; border: 1px dashed var(--line); color: var(--muted); }
 .results-note { display: inline-flex; align-items: center; gap: 9px; margin: 24px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
@@ -193,6 +236,7 @@ h1 { max-width: 690px; margin: 0; font-size: clamp(48px, 5.8vw, 82px); line-heig
 .site-footer { padding: 20px 0; background: var(--ink); color: rgba(255,255,255,.54); }
 .site-footer__inner { display: flex; align-items: center; justify-content: space-between; gap: 20px; font: 500 10px var(--mono); text-transform: uppercase; letter-spacing: .06em; }
 .site-footer a { display: inline-flex; align-items: center; gap: 6px; color: var(--lime); }
+.site-footer__links { display: inline-flex; align-items: center; gap: 18px; }
 
 @keyframes nav-reveal { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-35%); } }

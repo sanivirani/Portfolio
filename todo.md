@@ -10,3 +10,11 @@
 - [x] Implement accessible keyboard focus, reduced-motion support, and mobile-first layout refinements.
 - [x] Add search-engine metadata, robots instructions, and structured data appropriate for a personal portfolio.
 - [x] Add focused unit tests and validate the homepage in desktop and mobile previews.
+- [ ] Add Sani’s real public email address once supplied.
+- [x] Connect Sani’s supplied LinkedIn and GitHub profile links through the managed contact settings.
+- [ ] Add verified case-study metrics and fuller role descriptions once supplied by Sani.
+- [x] Design database entities for site settings, social links, case studies, metrics, and managed media.
+- [x] Build protected admin routes with a Shopify-style dashboard overview and content navigation.
+- [x] Implement CRUD editing, draft/publish status, ordering, and media selection for managed public content.
+- [x] Connect the public portfolio homepage to live managed content with safe empty states.
+- [x] Test admin authorization, content saving, and public rendering workflows.

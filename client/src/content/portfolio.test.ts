@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasCorePortfolioSections, portfolioContent } from "./portfolio";
+import { defaultSiteSettings, hasCorePortfolioSections, portfolioContent } from "./portfolio";
 
 describe("portfolio homepage content", () => {
   it("keeps the four-part growth loop intact", () => {
@@ -19,5 +19,11 @@ describe("portfolio homepage content", () => {
       "Digiplexo Pvt. Ltd.",
     ]);
     expect(JSON.stringify(portfolioContent.work)).not.toMatch(/ROAS|revenue|%|orders/i);
+  });
+
+  it("makes the supplied LinkedIn and GitHub links available to the managed contact area", () => {
+    expect(defaultSiteSettings.linkedinUrl).toBe("https://in.linkedin.com/in/sanivirani");
+    expect(defaultSiteSettings.githubUrl).toBe("https://github.com/");
+    expect(defaultSiteSettings.contactEmail).toBe("");
   });
 });
