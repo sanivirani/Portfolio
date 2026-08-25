@@ -4,6 +4,7 @@ import {
   caseStudies,
   CaseStudy,
   InsertUser,
+  ownerVerificationSessions,
   portfolioMedia,
   PortfolioMedia,
   portfolioSettings,
@@ -120,4 +121,25 @@ export async function removeMedia(id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available.");
   await db.delete(portfolioMedia).where(eq(portfolioMedia.id, id));
+}
+
+export async function getOwnerVerificationSession(userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(ownerVerificationSessions).where(eq(ownerVerificationSessions.userId, userId)).limit(1);
+  return result[0];
+}
+
+export async function markOwnerVerified(userId: number, expiresAt: Date) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available.");
+  await db.insert(ownerVerificationSessions).values({ userId, expiresAt }).onDuplicateKeyUpdate({
+    set: { verifiedAt: new Date(), expiresAt },
+  });
+}
+
+export async function clearOwnerVerification(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available.");
+  await db.delete(ownerVerificationSessions).where(eq(ownerVerificationSessions.userId, userId));
 }

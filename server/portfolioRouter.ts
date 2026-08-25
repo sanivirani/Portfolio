@@ -4,7 +4,7 @@ import { z } from "zod";
 import { defaultSiteSettings, portfolioContent } from "../shared/portfolioDefaults";
 import * as db from "./db";
 import { storagePut } from "./storage";
-import { adminProcedure, publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, publicProcedure, router, verifiedAdminProcedure } from "./_core/trpc";
 
 const pillarSchema = z.object({
   number: z.string().max(8),
@@ -133,7 +133,7 @@ export const portfolioRouter = router({
     }),
   }),
   admin: router({
-    initialize: adminProcedure.mutation(async () => {
+    initialize: verifiedAdminProcedure.mutation(async () => {
       const [settings, existingCaseStudies] = await Promise.all([
         db.getAllSettings(),
         db.getCaseStudies(),
@@ -179,7 +179,7 @@ export const portfolioRouter = router({
         const content = await db.getSetting("siteContent", defaultContent);
         return siteContentSchema.parse(content);
       }),
-      update: adminProcedure.input(siteContentSchema).mutation(async ({ input }) => {
+      update: verifiedAdminProcedure.input(siteContentSchema).mutation(async ({ input }) => {
         await db.setSetting("siteContent", input);
         return input;
       }),
@@ -189,14 +189,14 @@ export const portfolioRouter = router({
         const settings = await db.getSetting("siteSettings", defaultSiteSettings);
         return siteSettingsSchema.parse(settings);
       }),
-      update: adminProcedure.input(siteSettingsSchema).mutation(async ({ input }) => {
+      update: verifiedAdminProcedure.input(siteSettingsSchema).mutation(async ({ input }) => {
         await db.setSetting("siteSettings", input);
         return input;
       }),
     }),
     caseStudies: router({
       list: adminProcedure.query(async () => (await db.getCaseStudies()).map(parseCaseStudy)),
-      create: adminProcedure.input(caseStudyInputSchema).mutation(async ({ input }) => {
+      create: verifiedAdminProcedure.input(caseStudyInputSchema).mutation(async ({ input }) => {
         try {
           const id = await db.createCaseStudy(toCaseStudyValues(input));
           return { id };
@@ -207,7 +207,7 @@ export const portfolioRouter = router({
           throw error;
         }
       }),
-      update: adminProcedure.input(z.object({ id: z.number().int().positive(), values: caseStudyInputSchema })).mutation(async ({ input }) => {
+      update: verifiedAdminProcedure.input(z.object({ id: z.number().int().positive(), values: caseStudyInputSchema })).mutation(async ({ input }) => {
         try {
           const updated = await db.updateCaseStudy(input.id, toCaseStudyValues(input.values));
           if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Case study not found." });
@@ -219,14 +219,14 @@ export const portfolioRouter = router({
           throw error;
         }
       }),
-      remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ input }) => {
+      remove: verifiedAdminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ input }) => {
         await db.removeCaseStudy(input.id);
         return { removed: true };
       }),
     }),
     media: router({
       list: adminProcedure.query(() => db.getMedia()),
-      upload: adminProcedure.input(z.object({
+      upload: verifiedAdminProcedure.input(z.object({
         name: z.string().min(1).max(255),
         mimeType: z.string().regex(/^image\/(jpeg|png|webp|gif|svg\+xml)$/, "Use a supported image format."),
         dataUrl: z.string().min(1).max(45_000_000),
@@ -252,7 +252,7 @@ export const portfolioRouter = router({
         });
         return { id, url: stored.url };
       }),
-      update: adminProcedure.input(z.object({
+      update: verifiedAdminProcedure.input(z.object({
         id: z.number().int().positive(),
         altText: z.string().max(255),
         caption: z.string().max(1000),
@@ -260,7 +260,7 @@ export const portfolioRouter = router({
         await db.updateMedia(input.id, { altText: input.altText, caption: input.caption || null });
         return { updated: true };
       }),
-      remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ input }) => {
+      remove: verifiedAdminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ input }) => {
         await db.removeMedia(input.id);
         return { removed: true };
       }),

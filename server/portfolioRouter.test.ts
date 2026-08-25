@@ -10,10 +10,10 @@ function createAnonymousContext(): TrpcContext {
   };
 }
 
-function createAdminContext(): TrpcContext {
+function createAdminContext(id = 1): TrpcContext {
   return {
     user: {
-      id: 1,
+      id,
       openId: "portfolio-owner",
       email: "owner@example.com",
       name: "Sani Virani",
@@ -34,8 +34,14 @@ describe("portfolio admin router", () => {
     await expect(caller.portfolio.admin.overview()).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
+  it("rejects an unverified admin before any CMS initialization can change content", async () => {
+    const caller = appRouter.createCaller(createAdminContext(987654));
+    await expect(caller.portfolio.admin.initialize()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+  });
+
   it("initializes editable public portfolio records without adding invented metrics", async () => {
     const caller = appRouter.createCaller(createAdminContext());
+    await caller.ownerVerification.verifyPin({ pin: process.env.ADMIN_OWNER_PIN!, phone: process.env.ADMIN_OWNER_PHONE! });
     await expect(caller.portfolio.admin.initialize()).resolves.toEqual({ initialized: true });
     const [settings, caseStudies] = await Promise.all([
       caller.portfolio.admin.settings.get(),
@@ -45,9 +51,19 @@ describe("portfolio admin router", () => {
     expect(settings.githubUrl).toBe("https://github.com/");
     expect(caseStudies.map((item) => item.title)).toEqual(expect.arrayContaining(["Awaken Jewels", "Oraza", "Digiplexo Pvt. Ltd."]));
     expect(caseStudies.every((item) => item.metrics.length === 0)).toBe(true);
+    expect(caseStudies.every((item) => !item.role)).toBe(true);
     await expect(caller.portfolio.admin.settings.update(settings)).resolves.toEqual(settings);
     const publicSite = await caller.portfolio.public.site();
     expect(publicSite.settings).toEqual(settings);
     expect(publicSite.caseStudies).toHaveLength(3);
+  });
+
+  it("accepts the configured application-managed owner PIN through the verification endpoint", async () => {
+    const pin = process.env.ADMIN_OWNER_PIN;
+    const phone = process.env.ADMIN_OWNER_PHONE;
+    expect(pin).toBeTruthy();
+    expect(phone).toBeTruthy();
+    const caller = appRouter.createCaller(createAdminContext());
+    await expect(caller.ownerVerification.verifyPin({ pin: pin!, phone: phone! })).resolves.toMatchObject({ verified: true, expiresAt: expect.any(Date) });
   });
 });

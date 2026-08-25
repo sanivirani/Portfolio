@@ -30,6 +30,14 @@ export const portfolioMedia = mysqlTable("portfolioMedia", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const ownerVerificationSessions = mysqlTable("ownerVerificationSessions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  verifiedAt: timestamp("verifiedAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const caseStudies = mysqlTable("caseStudies", {
   id: int("id").autoincrement().primaryKey(),
   slug: varchar("slug", { length: 160 }).notNull().unique(),
@@ -55,3 +63,4 @@ export type InsertUser = typeof users.$inferInsert;
 export type PortfolioSetting = typeof portfolioSettings.$inferSelect;
 export type PortfolioMedia = typeof portfolioMedia.$inferSelect;
 export type CaseStudy = typeof caseStudies.$inferSelect;
+export type OwnerVerificationSession = typeof ownerVerificationSessions.$inferSelect;

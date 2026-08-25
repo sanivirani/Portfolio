@@ -1,6 +1,7 @@
 import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
+import { getOwnerVerificationSession } from "../db";
 import type { TrpcContext } from "./context";
 
 const t = initTRPC.context<TrpcContext>().create({
@@ -43,3 +44,14 @@ export const adminProcedure = t.procedure.use(
     });
   }),
 );
+
+export const verifiedAdminProcedure = adminProcedure.use(async opts => {
+  const session = await getOwnerVerificationSession(opts.ctx.user.id);
+  if (!session || session.expiresAt.getTime() <= Date.now()) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "Confirm the authorized owner phone and PIN before making CMS changes.",
+    });
+  }
+  return opts.next();
+});

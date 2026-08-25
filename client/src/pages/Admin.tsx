@@ -3,7 +3,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
-import { Check, ChevronLeft, Eye, FilePlus2, ImagePlus, Loader2, Plus, Save, Trash2, Upload, X } from "lucide-react";
+import { Check, ChevronLeft, Eye, FilePlus2, ImagePlus, Loader2, LockKeyhole, Plus, Save, ShieldCheck, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -79,13 +79,17 @@ export default function Admin() {
       ]);
     },
   });
+  const verificationStatus = trpc.ownerVerification.status.useQuery(undefined, { retry: false, enabled: user?.role === "admin" });
+  const revokeVerification = trpc.ownerVerification.revoke.useMutation({ onSuccess: () => verificationStatus.refetch() });
 
   useEffect(() => {
-    if (user?.role === "admin") initialize.mutate();
-  }, [user?.role]);
+    if (user?.role === "admin" && verificationStatus.data?.verified) initialize.mutate();
+  }, [user?.role, verificationStatus.data?.verified]);
 
   if (authLoading) return <DashboardLayout><LoadingPanel label="Checking admin access" /></DashboardLayout>;
   if (user && user.role !== "admin") return <DashboardLayout><div className="flex min-h-80 max-w-xl items-center border border-red-400/25 bg-red-500/10 p-7 text-red-100"><div><p className="font-mono text-[10px] uppercase tracking-[.12em] text-red-300">Restricted area</p><h1 className="mt-3 font-[Syne] text-3xl font-bold tracking-[-.05em]">Admin access required</h1><p className="mt-3 text-sm leading-6 text-red-100/75">This workspace is reserved for the portfolio owner. Sign in using the owner account to manage public content.</p></div></div></DashboardLayout>;
+  if (user?.role === "admin" && verificationStatus.isLoading) return <DashboardLayout><LoadingPanel label="Checking local owner verification" /></DashboardLayout>;
+  if (user?.role === "admin" && !verificationStatus.data?.verified) return <DashboardLayout><OwnerVerificationGate onVerified={() => verificationStatus.refetch()} /></DashboardLayout>;
 
   return (
     <DashboardLayout>
@@ -97,9 +101,7 @@ export default function Admin() {
               <h1 className="font-[Syne] text-4xl font-bold tracking-[-0.06em] text-white sm:text-5xl">{sectionTitles[activeSection].title}</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">{sectionTitles[activeSection].description}</p>
             </div>
-            <a href="/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 self-start border border-white/15 px-3 py-2 text-xs font-bold text-zinc-200 transition hover:border-lime-300 hover:text-lime-300 sm:self-auto">
-              View public site <Eye size={14} />
-            </a>
+            <div className="flex flex-wrap items-center gap-2"><a href="/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 self-start border border-white/15 px-3 py-2 text-xs font-bold text-zinc-200 transition hover:border-lime-300 hover:text-lime-300 sm:self-auto">View public site <Eye size={14} /></a><Button variant="outline" onClick={() => revokeVerification.mutate()} className="h-9 rounded-none border-white/15 bg-transparent px-3 text-xs text-zinc-300 hover:bg-white/10 hover:text-white"><LockKeyhole size={14} /> Lock edits</Button></div>
           </div>
 
           {initialize.isPending && <div className="mb-5 flex items-center gap-2 border border-lime-300/20 bg-lime-300/10 px-3 py-2 text-xs text-lime-200"><Loader2 className="animate-spin" size={14} /> Preparing editable portfolio content…</div>}
@@ -112,6 +114,13 @@ export default function Admin() {
       </div>
     </DashboardLayout>
   );
+}
+
+function OwnerVerificationGate({ onVerified }: { onVerified: () => void }) {
+  const [phone, setPhone] = useState("");
+  const [pin, setPin] = useState("");
+  const verify = trpc.ownerVerification.verifyPin.useMutation({ onSuccess: onVerified });
+  return <div className="mx-auto flex min-h-[calc(100vh-7rem)] max-w-xl items-center py-10"><div className="w-full border border-lime-300/25 bg-[#171d16] p-6 shadow-2xl shadow-black/25 sm:p-8"><div className="flex size-12 items-center justify-center bg-lime-300 text-black"><ShieldCheck size={23} /></div><p className="mt-6 font-mono text-[10px] uppercase tracking-[.14em] text-lime-300">Owner confirmation</p><h1 className="mt-3 font-[Syne] text-4xl font-bold tracking-[-.06em] text-white">Confirm before editing.</h1><p className="mt-4 text-sm leading-6 text-zinc-400">This content studio is protected by the signed-in owner account plus a local confirmation of the registered phone number and private owner PIN. No SMS or third-party verification API is used.</p><div className="mt-7 grid gap-4"><Field label="Registered owner phone"><input inputMode="tel" autoComplete="tel" className={fieldClassName()} placeholder="Enter the authorized number" value={phone} onChange={(event) => setPhone(event.target.value)} /></Field><Field label="Private owner PIN"><input type="password" autoComplete="one-time-code" className={fieldClassName()} placeholder="Enter your private PIN" value={pin} onChange={(event) => setPin(event.target.value)} /></Field><Button disabled={!phone || !pin || verify.isPending} onClick={() => verify.mutate({ phone, pin })} className="mt-2 rounded-none bg-lime-300 text-black hover:bg-lime-200 disabled:opacity-50">{verify.isPending ? <Loader2 className="animate-spin" size={16} /> : <ShieldCheck size={16} />} Confirm editing access</Button>{verify.error && <p className="text-xs leading-5 text-red-300">{verify.error.message}</p>}</div><p className="mt-6 border-t border-white/10 pt-4 text-xs leading-5 text-zinc-500">Editing access is active for 30 minutes and can be locked at any time from the content studio header.</p></div></div>;
 }
 
 function Overview({ onNavigate }: { onNavigate: (path: string) => void }) {

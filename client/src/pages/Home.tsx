@@ -32,6 +32,16 @@ export default function Home() {
     process: portfolioContent.process.map(([number, title, description]) => ({ number, title, description })),
   };
   const settings = managedSite?.settings ?? defaultSiteSettings;
+  const contactHref = settings.contactEmail
+    ? `mailto:${settings.contactEmail}?subject=Project%20enquiry%20for%20${encodeURIComponent(content.name)}`
+    : settings.linkedinUrl || settings.githubUrl || "#contact";
+  const contactLabel = settings.contactEmail
+    ? "Prepare a project enquiry"
+    : settings.linkedinUrl
+      ? "Connect on LinkedIn"
+      : settings.githubUrl
+        ? "View GitHub profile"
+        : "Start a conversation";
   const publicWork = managedSite?.caseStudies.length
     ? managedSite.caseStudies.map((item) => ({
         title: item.title,
@@ -341,8 +351,8 @@ export default function Home() {
             </div>
             <div className="contact__details">
               <p>{settings.contactIntro}</p>
-              <a className="button button--dark" href={settings.contactEmail ? `mailto:${settings.contactEmail}?subject=Project%20enquiry%20for%20${encodeURIComponent(content.name)}` : "/admin/settings"}>
-                {settings.contactEmail ? "Prepare a project enquiry" : "Add your email in CMS"} <ArrowUpRight size={18} aria-hidden="true" />
+              <a className="button button--dark" href={contactHref} target={settings.contactEmail || contactHref === "#contact" ? undefined : "_blank"} rel={settings.contactEmail || contactHref === "#contact" ? undefined : "noreferrer"}>
+                {contactLabel} <ArrowUpRight size={18} aria-hidden="true" />
               </a>
               <div className="social-placeholder" aria-label="Social profiles">
                 <span>Social profiles</span>
