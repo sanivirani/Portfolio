@@ -23,6 +23,22 @@ describe("portfolio homepage content", () => {
     expect(hasCorePortfolioSections()).toBe(true);
   });
 
+  it("provides editable defaults for every public editorial label and statistic", () => {
+    expect(portfolioContent.editorial).toMatchObject({
+      siteLabel: expect.any(String),
+      navHome: expect.any(String),
+      navContact: expect.any(String),
+      menuLabel: expect.any(String),
+      filterEmptyMessage: expect.any(String),
+      heroTitleLineOne: expect.any(String),
+      portraitUrl: expect.stringMatching(/^\/manus-storage\//),
+      contactHeadline: expect.any(String),
+      contactLocationLabel: expect.any(String),
+      footerTagline: expect.any(String),
+    });
+    expect(portfolioContent.editorial.stats).toHaveLength(4);
+  });
+
   it("uses supplied project names without inventing outcome metrics", () => {
     expect(portfolioContent.work.map((item) => item.title)).toEqual([
       "Awaken Jewels",

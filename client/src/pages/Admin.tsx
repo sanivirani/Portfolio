@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
+import { portfolioContent } from "@/content/portfolio";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { Check, ChevronLeft, Eye, FilePlus2, ImagePlus, Loader2, LockKeyhole, Plus, Save, ShieldCheck, Trash2, Upload, X } from "lucide-react";
@@ -160,7 +161,7 @@ function ContentEditor() {
   const updatePillar = (index: number, key: "title" | "eyebrow" | "description" | "tags", value: string) => {
     setDraft({ ...draft, pillars: draft.pillars.map((pillar, itemIndex) => itemIndex === index ? { ...pillar, [key]: key === "tags" ? value.split(",").map((tag) => tag.trim()).filter(Boolean) : value } : pillar) });
   };
-  return <div className="space-y-7">
+  return <div className="min-w-0 space-y-7">
     <div className="grid gap-5 border border-white/10 bg-[#171d16] p-5 md:grid-cols-2">
       <Field label="Name"><input className={fieldClassName()} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></Field>
       <Field label="Positioning"><input className={fieldClassName()} value={draft.positioning} onChange={(event) => setDraft({ ...draft, positioning: event.target.value })} /></Field>
@@ -180,8 +181,78 @@ function ContentEditor() {
       <Field label="Contact heading"><textarea className={fieldClassName()} rows={2} value={draft.sections.contactHeading} onChange={(event) => setDraft({ ...draft, sections: { ...draft.sections, contactHeading: event.target.value } })} /></Field>
     </div>
     <div><div className="mb-4 flex items-end justify-between"><div><p className="font-mono text-[10px] uppercase tracking-[.12em] text-lime-300">Expertise system</p><h2 className="mt-2 font-[Syne] text-2xl font-bold tracking-[-.05em] text-white">Service pillars</h2></div><span className="text-xs text-zinc-500">Comma-separate skills</span></div><div className="grid gap-4 md:grid-cols-2">{draft.pillars.map((pillar, index) => <div key={pillar.number} className="border border-white/10 bg-[#171d16] p-5"><p className="font-mono text-[10px] text-lime-300">{pillar.number}</p><div className="mt-4 grid gap-3"><Field label="Title"><input className={fieldClassName()} value={pillar.title} onChange={(event) => updatePillar(index, "title", event.target.value)} /></Field><Field label="Eyebrow"><input className={fieldClassName()} value={pillar.eyebrow} onChange={(event) => updatePillar(index, "eyebrow", event.target.value)} /></Field><Field label="Description"><textarea className={fieldClassName()} rows={3} value={pillar.description} onChange={(event) => updatePillar(index, "description", event.target.value)} /></Field><Field label="Tags"><input className={fieldClassName()} value={pillar.tags.join(", ")} onChange={(event) => updatePillar(index, "tags", event.target.value)} /></Field></div></div>)}</div></div>
+    <EditorialFields value={{ ...portfolioContent.editorial, ...draft.editorial }} onChange={(editorial) => setDraft({ ...draft, editorial })} />
+    <PortfolioStructureEditor journey={draft.journey} process={draft.process} stack={draft.stack} onJourneyChange={(journey) => setDraft({ ...draft, journey })} onProcessChange={(process) => setDraft({ ...draft, process })} onStackChange={(stack) => setDraft({ ...draft, stack })} />
     <SaveBar label="Save homepage content" saving={update.isPending} onSave={() => update.mutate(draft)} success={update.isSuccess} />
   </div>;
+}
+
+type EditorialContent = typeof portfolioContent.editorial;
+type JourneyItem = { period: string; company: string; role: string; track: string };
+type ProcessItem = { number: string; title: string; description: string };
+
+function EditorialFields({ value, onChange }: { value: EditorialContent; onChange: (value: EditorialContent) => void }) {
+  const update = <K extends keyof EditorialContent>(key: K, next: EditorialContent[K]) => onChange({ ...value, [key]: next });
+  const updateStat = (index: number, key: "value" | "labelLineOne" | "labelLineTwo", next: string) => update("stats", value.stats.map((stat, statIndex) => statIndex === index ? { ...stat, [key]: next } : stat));
+  return <div className="space-y-5">
+    <div className="border border-white/10 bg-[#171d16] p-5"><p className="font-mono text-[10px] uppercase tracking-[.12em] text-lime-300">Editorial interface</p><h2 className="mt-2 font-[Syne] text-2xl font-bold tracking-[-.05em] text-white">Portfolio labels and calls to action</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">Every visible navigation label, hero line, stat, section label, and contact call-to-action is controlled here. Use a line break to preserve the intentional stacked editorial treatment.</p></div>
+    <div className="grid min-w-0 gap-5 border border-white/10 bg-[#171d16] p-5 md:grid-cols-2">
+      <Field label="Portfolio label"><input className={fieldClassName()} value={value.siteLabel} onChange={(event) => update("siteLabel", event.target.value)} /></Field>
+      <Field label="Hero kicker"><input className={fieldClassName()} value={value.heroKicker} onChange={(event) => update("heroKicker", event.target.value)} /></Field>
+      <Field label="Navigation: home"><input className={fieldClassName()} value={value.navHome} onChange={(event) => update("navHome", event.target.value)} /></Field>
+      <Field label="Navigation: work"><input className={fieldClassName()} value={value.navWork} onChange={(event) => update("navWork", event.target.value)} /></Field>
+      <Field label="Navigation: about"><input className={fieldClassName()} value={value.navAbout} onChange={(event) => update("navAbout", event.target.value)} /></Field>
+      <Field label="Navigation: services"><input className={fieldClassName()} value={value.navServices} onChange={(event) => update("navServices", event.target.value)} /></Field>
+      <Field label="Navigation: experience"><input className={fieldClassName()} value={value.navExperience} onChange={(event) => update("navExperience", event.target.value)} /></Field>
+      <Field label="Navigation: contact"><input className={fieldClassName()} value={value.navContact} onChange={(event) => update("navContact", event.target.value)} /></Field>
+      <Field label="Mobile menu label"><input className={fieldClassName()} value={value.menuLabel} onChange={(event) => update("menuLabel", event.target.value)} /></Field>
+      <Field label="Availability line one"><input className={fieldClassName()} value={value.availabilityLineOne} onChange={(event) => update("availabilityLineOne", event.target.value)} /></Field>
+      <Field label="Availability line two"><input className={fieldClassName()} value={value.availabilityLineTwo} onChange={(event) => update("availabilityLineTwo", event.target.value)} /></Field>
+      <Field label="Hero display line one"><input className={fieldClassName()} value={value.heroTitleLineOne} onChange={(event) => update("heroTitleLineOne", event.target.value)} /></Field>
+      <Field label="Hero display line two"><input className={fieldClassName()} value={value.heroTitleLineTwo} onChange={(event) => update("heroTitleLineTwo", event.target.value)} /></Field>
+      <Field label="Hero script"><input className={fieldClassName()} value={value.heroScript} onChange={(event) => update("heroScript", event.target.value)} /></Field>
+      <Field label="Hero call-to-action"><input className={fieldClassName()} value={value.heroCta} onChange={(event) => update("heroCta", event.target.value)} /></Field>
+      <Field label="Portrait image URL" className="md:col-span-2"><input type="url" className={fieldClassName()} value={value.portraitUrl} onChange={(event) => update("portraitUrl", event.target.value)} /></Field>
+      <Field label="Portrait image alt text" className="md:col-span-2"><input className={fieldClassName()} value={value.portraitAlt} onChange={(event) => update("portraitAlt", event.target.value)} /></Field>
+      <Field label="Credibility headline (line breaks supported)" className="md:col-span-2"><textarea className={fieldClassName()} rows={3} value={value.credibilityHeadline} onChange={(event) => update("credibilityHeadline", event.target.value)} /></Field>
+    </div>
+    <div className="border border-white/10 bg-[#171d16] p-5"><div><p className="font-mono text-[10px] uppercase tracking-[.12em] text-lime-300">Credibility panel</p><h2 className="mt-2 font-[Syne] text-2xl font-bold tracking-[-.05em] text-white">Statistics</h2></div><div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">{value.stats.map((stat, index) => <div key={`${stat.value}-${index}`} className="grid min-w-0 gap-3 border border-white/10 p-4"><Field label="Value"><input className={fieldClassName()} value={stat.value} onChange={(event) => updateStat(index, "value", event.target.value)} /></Field><Field label="Label line one"><input className={fieldClassName()} value={stat.labelLineOne} onChange={(event) => updateStat(index, "labelLineOne", event.target.value)} /></Field><Field label="Label line two"><input className={fieldClassName()} value={stat.labelLineTwo} onChange={(event) => updateStat(index, "labelLineTwo", event.target.value)} /></Field></div>)}</div></div>
+    <div className="grid min-w-0 gap-5 border border-white/10 bg-[#171d16] p-5 md:grid-cols-2">
+      <Field label="Work section label (line breaks supported)"><textarea className={fieldClassName()} rows={2} value={value.workLabel} onChange={(event) => update("workLabel", event.target.value)} /></Field>
+      <Field label="Work section CTA"><input className={fieldClassName()} value={value.workCta} onChange={(event) => update("workCta", event.target.value)} /></Field>
+      <Field label="Work note" className="md:col-span-2"><textarea className={fieldClassName()} rows={2} value={value.workNote} onChange={(event) => update("workNote", event.target.value)} /></Field>
+      <Field label="Project filter label"><input className={fieldClassName()} value={value.filterLabel} onChange={(event) => update("filterLabel", event.target.value)} /></Field>
+      <Field label="All-work filter label"><input className={fieldClassName()} value={value.filterAllLabel} onChange={(event) => update("filterAllLabel", event.target.value)} /></Field>
+      <Field label="Role filter prefix"><input className={fieldClassName()} value={value.filterRolePrefix} onChange={(event) => update("filterRolePrefix", event.target.value)} /></Field>
+      <Field label="Project filter empty-state message" className="md:col-span-2"><textarea className={fieldClassName()} rows={2} value={value.filterEmptyMessage} onChange={(event) => update("filterEmptyMessage", event.target.value)} /></Field>
+      <Field label="Services label (line breaks supported)"><textarea className={fieldClassName()} rows={2} value={value.servicesLabel} onChange={(event) => update("servicesLabel", event.target.value)} /></Field>
+      <Field label="Experience title (line breaks supported)"><textarea className={fieldClassName()} rows={2} value={value.experienceTitle} onChange={(event) => update("experienceTitle", event.target.value)} /></Field>
+      <Field label="Collaborations label"><input className={fieldClassName()} value={value.collaborationsLabel} onChange={(event) => update("collaborationsLabel", event.target.value)} /></Field>
+      <Field label="Contact heading (line breaks supported)"><textarea className={fieldClassName()} rows={2} value={value.contactHeadline} onChange={(event) => update("contactHeadline", event.target.value)} /></Field>
+      <Field label="Contact availability (line breaks supported)"><textarea className={fieldClassName()} rows={2} value={value.contactAvailability} onChange={(event) => update("contactAvailability", event.target.value)} /></Field>
+      <Field label="Contact fallback label"><input className={fieldClassName()} value={value.contactFallbackLabel} onChange={(event) => update("contactFallbackLabel", event.target.value)} /></Field>
+      <Field label="Location label"><input className={fieldClassName()} value={value.contactLocationLabel} onChange={(event) => update("contactLocationLabel", event.target.value)} /></Field>
+      <Field label="LinkedIn display label"><input className={fieldClassName()} value={value.linkedinDisplayLabel} onChange={(event) => update("linkedinDisplayLabel", event.target.value)} /></Field>
+      <Field label="GitHub display label"><input className={fieldClassName()} value={value.githubDisplayLabel} onChange={(event) => update("githubDisplayLabel", event.target.value)} /></Field>
+      <Field label="Resume button label"><input className={fieldClassName()} value={value.resumeLabel} onChange={(event) => update("resumeLabel", event.target.value)} /></Field>
+      <Field label="Copy email button label"><input className={fieldClassName()} value={value.copyEmailLabel} onChange={(event) => update("copyEmailLabel", event.target.value)} /></Field>
+      <Field label="Unavailable-email label"><input className={fieldClassName()} value={value.emailUnavailableLabel} onChange={(event) => update("emailUnavailableLabel", event.target.value)} /></Field>
+      <Field label="Email copied label"><input className={fieldClassName()} value={value.emailCopiedLabel} onChange={(event) => update("emailCopiedLabel", event.target.value)} /></Field>
+      <Field label="Email copied announcement"><input className={fieldClassName()} value={value.emailCopiedMessage} onChange={(event) => update("emailCopiedMessage", event.target.value)} /></Field>
+      <Field label="Thank-you script"><input className={fieldClassName()} value={value.thanksLabel} onChange={(event) => update("thanksLabel", event.target.value)} /></Field>
+      <Field label="Footer tagline"><input className={fieldClassName()} value={value.footerTagline} onChange={(event) => update("footerTagline", event.target.value)} /></Field>
+      <Field label="Content Studio footer label"><input className={fieldClassName()} value={value.studioLabel} onChange={(event) => update("studioLabel", event.target.value)} /></Field>
+    </div>
+  </div>;
+}
+
+function PortfolioStructureEditor({ journey, process, stack, onJourneyChange, onProcessChange, onStackChange }: { journey: JourneyItem[]; process: ProcessItem[]; stack: string[]; onJourneyChange: (value: JourneyItem[]) => void; onProcessChange: (value: ProcessItem[]) => void; onStackChange: (value: string[]) => void }) {
+  return <div className="space-y-5"><div className="border border-white/10 bg-[#171d16] p-5"><p className="font-mono text-[10px] uppercase tracking-[.12em] text-lime-300">Portfolio structure</p><h2 className="mt-2 font-[Syne] text-2xl font-bold tracking-[-.05em] text-white">Timeline, process, and working stack</h2></div><EditableCollection title="Experience timeline" description="These entries appear in the public Experience & Practice panel." items={journey} emptyItem={{ period: "New stage", company: "Company", role: "Role", track: "Track" }} fields={["period", "company", "role", "track"] as const} onChange={onJourneyChange} /><EditableCollection title="Working process" description="These steps are stored with your narrative content for future public process treatments." items={process} emptyItem={{ number: String(process.length + 1).padStart(2, "0"), title: "New process step", description: "Describe the purpose of this step." }} fields={["number", "title", "description"] as const} onChange={onProcessChange} /><div className="border border-white/10 bg-[#171d16] p-5"><Field label="Technology and growth stack (one item per line)"><textarea className={fieldClassName()} rows={5} value={stack.join("\n")} onChange={(event) => onStackChange(splitItems(event.target.value))} /></Field></div></div>;
+}
+
+function EditableCollection<T extends Record<string, string>, K extends keyof T>({ title, description, items, emptyItem, fields, onChange }: { title: string; description: string; items: T[]; emptyItem: T; fields: readonly K[]; onChange: (items: T[]) => void }) {
+  const update = (index: number, key: K, value: string) => onChange(items.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item));
+  return <div className="border border-white/10 bg-[#171d16] p-5"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="font-[Syne] text-2xl font-bold tracking-[-.05em] text-white">{title}</h2><p className="mt-1 text-sm text-zinc-400">{description}</p></div><Button type="button" variant="outline" onClick={() => onChange([...items, emptyItem])} className="rounded-none border-white/20 bg-transparent text-white hover:bg-white/10"><Plus size={15} /> Add entry</Button></div><div className="mt-5 space-y-3">{items.map((item, index) => <div key={`${title}-${index}`} className="grid min-w-0 gap-3 border border-white/10 p-4 md:grid-cols-2">{fields.map((field) => <Field key={String(field)} label={String(field)} className={field === "description" ? "md:col-span-2" : undefined}>{field === "description" ? <textarea className={fieldClassName()} rows={3} value={item[field]} onChange={(event) => update(index, field, event.target.value)} /> : <input className={fieldClassName()} value={item[field]} onChange={(event) => update(index, field, event.target.value)} />}</Field>)}<button type="button" onClick={() => onChange(items.filter((_, itemIndex) => itemIndex !== index))} className="justify-self-start border border-red-400/30 px-3 py-2 text-xs font-bold text-red-300 transition hover:bg-red-500/10 md:col-span-2">Remove entry</button></div>)}</div></div>;
 }
 
 function SettingsEditor() {

@@ -22,4 +22,9 @@
 - [x] Extend deterministic content tests for the role-aware filter configuration, validate the live interactions at desktop and mobile widths, and checkpoint the finished enhancement.
 - [x] Keep the Copy Email control unavailable until the user supplies a contact email, as requested.
 - [x] Strengthen the project-card hover lift and add a soft drop shadow while preserving the dark editorial aesthetic.
-- [ ] Validate the hover refinement at desktop and mobile widths, run checks, and checkpoint the published update.
+- [x] Validate the hover refinement at desktop and mobile widths, run checks, and checkpoint the published update.
+- [x] Repair the Content Studio admin-panel layout code; authenticated desktop and mobile visual verification is deferred at the user’s request.
+- [x] Move every remaining public interface label, contact display string, filter message, and availability string into editable admin content or settings.
+- [x] Add or update tests for the extended editable-content contract and admin mutations.
+- [x] Validate the repaired Content Studio through automated content-contract checks and verify public-site compatibility, then checkpoint the published update.
+- [x] Record the authenticated Content Studio visual review as deferred at the user’s request.

@@ -22,7 +22,6 @@ import {
   editorialProjectCards,
   getProjectFilters,
   portfolioContent,
-  portfolioNavigation,
   portfolioResume,
   portfolioStats,
   projectMatchesFilters,
@@ -30,7 +29,6 @@ import {
 import { trpc } from "@/lib/trpc";
 
 const assetUrls = {
-  portrait: "/manus-storage/editorial-portrait_84d1e18b.jpeg",
   jewelry: "/manus-storage/jewelry-editorial_bb3146ba.jpg",
   mobile: "/manus-storage/app-mockup_a0db00ca.png",
 };
@@ -95,6 +93,15 @@ export default function Home() {
         role: item.title === "Digiplexo Pvt. Ltd." ? "Shopify Developer + Performance Marketer" : "",
       }));
   const roles = content.positioning.split(" · ");
+  const editorial = content.editorial;
+  const navigation = [
+    [editorial.navHome, "#top"],
+    [editorial.navWork, "#work"],
+    [editorial.navAbout, "#principle"],
+    [editorial.navServices, "#services"],
+    [editorial.navExperience, "#experience"],
+    [editorial.navContact, "#contact"],
+  ] as const;
   const contactHref = settings.contactEmail
     ? `mailto:${settings.contactEmail}?subject=Project%20enquiry%20for%20${encodeURIComponent(content.name)}`
     : settings.linkedinUrl || "#contact";
@@ -150,17 +157,17 @@ export default function Home() {
       <header className="topbar">
         <div className="page-width topbar__inside">
           <a className="topbar__portfolio" href="#top" aria-label={`${content.name} home`}>
-            <span>PORTFOLIO</span>
+            <span>{editorial.siteLabel}</span>
             <i aria-hidden="true" />
           </a>
 
           <nav className="desktop-nav" aria-label="Main navigation">
-            {portfolioNavigation.map(([label, href]) => <a href={href} key={label}>{label}</a>)}
+            {navigation.map(([label, href]) => <a href={href} key={href}>{label}</a>)}
           </nav>
 
           <div className="topbar__available" aria-label="Available for freelance projects">
             <span className="available-orbit" aria-hidden="true" />
-            <span>AVAILABLE FOR<br />FREELANCE PROJECTS</span>
+            <span>{editorial.availabilityLineOne}<br />{editorial.availabilityLineTwo}</span>
           </div>
 
           <button
@@ -178,12 +185,12 @@ export default function Home() {
       {menuOpen && (
         <nav className="mobile-menu" aria-label="Mobile navigation">
           <div className="mobile-menu__top">
-            <span>MENU</span>
-            <span>0{portfolioNavigation.length}</span>
+            <span>{editorial.menuLabel}</span>
+            <span>0{navigation.length}</span>
           </div>
           <div className="mobile-menu__links">
-            {portfolioNavigation.map(([label, href], index) => (
-              <a href={href} key={label} onClick={() => setMenuOpen(false)}>
+            {navigation.map(([label, href], index) => (
+              <a href={href} key={href} onClick={() => setMenuOpen(false)}>
                 <small>0{index + 1}</small><span>{label}</span><ArrowRight size={20} aria-hidden="true" />
               </a>
             ))}
@@ -196,17 +203,17 @@ export default function Home() {
         <section className="hero-section" id="top">
           <div className="page-width hero-grid">
             <div className="hero-copy">
-              <p className="hero-kicker">DIGITAL COMMERCE, CONNECTED</p>
-              <h1><span>CREATIVE</span><span>GROWTH</span></h1>
-              <span className="script-line">by design</span>
+              <p className="hero-kicker">{editorial.heroKicker}</p>
+              <h1><span>{editorial.heroTitleLineOne}</span><span>{editorial.heroTitleLineTwo}</span></h1>
+              <span className="script-line">{editorial.heroScript}</span>
               <p className="hero-statement">{content.hero}</p>
-              <a className="primary-link" href="#work">VIEW MY WORK <ArrowDownRight size={19} aria-hidden="true" /></a>
+              <a className="primary-link" href="#work">{editorial.heroCta} <ArrowDownRight size={19} aria-hidden="true" /></a>
               <span className="hero-gridmark" aria-hidden="true">✦</span>
             </div>
 
             <div className="hero-portrait-wrap">
               <div className="portrait-frame">
-                <img src={assetUrls.portrait} alt="Black-and-white editorial portrait" />
+                <img src={editorial.portraitUrl} alt={editorial.portraitAlt} />
               </div>
               <div className="role-list">
                 {roles.map((role) => <span key={role}>{role}</span>)}
@@ -218,11 +225,11 @@ export default function Home() {
         <section className="credibility page-width" aria-labelledby="credibility-title">
           <div className="credibility__intro">
             <Sparkles size={20} aria-hidden="true" />
-            <h2 id="credibility-title">BUILD<br />WITH INTENT.<br /><em>CREATE</em> MOMENTUM.</h2>
+            <h2 id="credibility-title" className="whitespace-pre-line">{editorial.credibilityHeadline}</h2>
             <p>{content.supportingLine}</p>
           </div>
-          {portfolioStats.map((stat, index) => (
-            <div className="stat-block" key={stat.value}>
+          {editorial.stats.map((stat, index) => (
+            <div className="stat-block" key={`${stat.value}-${index}`}>
               <span className="stat-block__icon" aria-hidden="true">
                 {index === 0 && <Box size={21} />}
                 {index === 1 && <MousePointer2 size={21} />}
@@ -230,23 +237,23 @@ export default function Home() {
                 {index === 3 && <Globe2 size={21} />}
               </span>
               <strong>{stat.value}</strong>
-              <span>{stat.label.map((line) => <span key={line}>{line}</span>)}</span>
+              <span><span>{stat.labelLineOne}</span><span>{stat.labelLineTwo}</span></span>
             </div>
           ))}
         </section>
 
         <section className="work-section page-width" id="work" aria-labelledby="work-title">
           <div className="section-bar">
-            <div><p>SELECTED<br />PROJECTS <ArrowUpRight size={16} aria-hidden="true" /></p></div>
-            <a href="#contact">EXPLORE A PROJECT <ArrowRight size={17} aria-hidden="true" /></a>
+            <div><p className="whitespace-pre-line">{editorial.workLabel} <ArrowUpRight size={16} aria-hidden="true" /></p></div>
+            <a href="#contact">{editorial.workCta} <ArrowRight size={17} aria-hidden="true" /></a>
           </div>
           <div className="project-filter" aria-label="Filter projects by technology or role">
-            <span>FILTER BY</span>
+            <span>{editorial.filterLabel}</span>
             <div className="project-filter__controls" role="group" aria-label="Project categories">
-              <button type="button" className={activeFilters.length === 0 ? "is-active" : ""} aria-pressed={activeFilters.length === 0} onClick={() => setActiveFilters([])}>ALL WORK</button>
+              <button type="button" className={activeFilters.length === 0 ? "is-active" : ""} aria-pressed={activeFilters.length === 0} onClick={() => setActiveFilters([])}>{editorial.filterAllLabel}</button>
               {projectFilters.map((filter) => (
                 <button type="button" className={activeFilters.includes(filter.key) ? "is-active" : ""} aria-pressed={activeFilters.includes(filter.key)} onClick={() => toggleProjectFilter(filter.key)} key={filter.key}>
-                  {filter.kind === "Role" ? "ROLE · " : ""}{filter.label}
+                  {filter.kind === "Role" ? `${editorial.filterRolePrefix} ` : ""}{filter.label}
                 </button>
               ))}
             </div>
@@ -273,12 +280,12 @@ export default function Home() {
               );
             })}
           </div>
-          {visibleWork.length === 0 && <p className="project-empty" role="status">No project matches this combination. Remove a filter or choose All Work to explore the full portfolio.</p>}
-          <p className="work-note">Project descriptions reflect the supplied portfolio record; outcomes are discussed from verified project data only.</p>
+          {visibleWork.length === 0 && <p className="project-empty" role="status">{editorial.filterEmptyMessage}</p>}
+          <p className="work-note">{editorial.workNote}</p>
         </section>
 
         <section className="services-section page-width" id="services" aria-labelledby="services-title">
-          <div className="services-heading"><p>WHAT<br />I DO <ArrowDownRight size={16} aria-hidden="true" /></p></div>
+          <div className="services-heading"><p className="whitespace-pre-line">{editorial.servicesLabel} <ArrowDownRight size={16} aria-hidden="true" /></p></div>
           <div className="service-grid" id="services-title">
             {content.pillars.map((pillar, index) => (
               <article className="service-card" key={pillar.title}>
@@ -298,7 +305,7 @@ export default function Home() {
 
         <section className="experience-section page-width" id="experience" aria-labelledby="experience-title" data-reveal>
           <div className="experience-list">
-            <div className="experience-list__heading"><h2 id="experience-title">EXPERIENCE<br />&amp; PRACTICE</h2><ArrowRight size={18} aria-hidden="true" /></div>
+            <div className="experience-list__heading"><h2 id="experience-title" className="whitespace-pre-line">{editorial.experienceTitle}</h2><ArrowRight size={18} aria-hidden="true" /></div>
             <ol>
               {content.journey.map((item, index) => (
                 <li key={item.company}>
@@ -316,34 +323,34 @@ export default function Home() {
         </section>
 
         <section className="collaborations page-width" aria-label="Selected collaborations">
-          <p>SELECTED COLLABORATIONS <ArrowUpRight size={15} aria-hidden="true" /></p>
+          <p>{editorial.collaborationsLabel} <ArrowUpRight size={15} aria-hidden="true" /></p>
           <div>{suppliedWork.slice(0, 3).map((project) => <span key={project.title}>{project.title}</span>)}</div>
         </section>
 
         <section className="contact-section page-width" id="contact" aria-labelledby="contact-title">
-          <div className="contact-lockup"><h2 id="contact-title">LET’S<br />BUILD<br />TOGETHER</h2><span aria-hidden="true">✦</span></div>
+          <div className="contact-lockup"><h2 id="contact-title" className="whitespace-pre-line">{editorial.contactHeadline}</h2><span aria-hidden="true">✦</span></div>
           <div className="contact-details">
-            <p>I’M CURRENTLY AVAILABLE<br />FOR SELECTED PROJECTS</p>
-            <a href={contactHref} target={contactExternal ? "_blank" : undefined} rel={contactExternal ? "noreferrer" : undefined}><Mail size={17} aria-hidden="true" />{settings.contactEmail || "Connect on LinkedIn"}</a>
-            <a href={settings.linkedinUrl} target="_blank" rel="noreferrer"><Linkedin size={17} aria-hidden="true" />linkedin.com/in/sanivirani</a>
-            <a href="https://github.com/" target="_blank" rel="noreferrer"><Code2 size={17} aria-hidden="true" />github.com</a>
-            <span><Globe2 size={17} aria-hidden="true" />Worldwide / Remote</span>
+            <p className="whitespace-pre-line">{editorial.contactAvailability}</p>
+            <a href={contactHref} target={contactExternal ? "_blank" : undefined} rel={contactExternal ? "noreferrer" : undefined}><Mail size={17} aria-hidden="true" />{settings.contactEmail || editorial.contactFallbackLabel}</a>
+            <a href={settings.linkedinUrl} target="_blank" rel="noreferrer"><Linkedin size={17} aria-hidden="true" />{editorial.linkedinDisplayLabel}</a>
+            <a href={settings.githubUrl} target="_blank" rel="noreferrer"><Code2 size={17} aria-hidden="true" />{editorial.githubDisplayLabel}</a>
+            <span><Globe2 size={17} aria-hidden="true" />{editorial.contactLocationLabel}</span>
             <div className="contact-actions">
-              <a className="contact-action resume-download" href={portfolioResume.url} download={portfolioResume.filename}><FileDown size={16} aria-hidden="true" />DOWNLOAD RESUME</a>
+              <a className="contact-action resume-download" href={portfolioResume.url} download={portfolioResume.filename}><FileDown size={16} aria-hidden="true" />{editorial.resumeLabel}</a>
               <button className={`contact-action copy-email${emailCopied ? " is-copied" : ""}`} type="button" onClick={copyEmail} disabled={!emailAddress} aria-label={emailAddress ? "Copy email address" : "Email address is not configured"}>
-                {emailCopied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}{emailCopied ? "EMAIL COPIED" : emailAddress ? "COPY EMAIL" : "EMAIL UNAVAILABLE"}
+                {emailCopied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}{emailCopied ? editorial.emailCopiedLabel : emailAddress ? editorial.copyEmailLabel : editorial.emailUnavailableLabel}
               </button>
             </div>
-            <span className="copy-status" aria-live="polite">{emailCopied ? "Email address copied to clipboard." : ""}</span>
+            <span className="copy-status" aria-live="polite">{emailCopied ? editorial.emailCopiedMessage : ""}</span>
           </div>
-          <div className="contact-portrait"><img src={assetUrls.portrait} alt="" /><a href={contactHref} aria-label="Start a project conversation"><ArrowUpRight size={24} /></a><span className="thank-you">Thank you</span></div>
+          <div className="contact-portrait"><img src={editorial.portraitUrl} alt="" /><a href={contactHref} aria-label="Start a project conversation"><ArrowUpRight size={24} /></a><span className="thank-you">{editorial.thanksLabel}</span></div>
         </section>
       </main>
 
       <footer className="footer page-width">
         <span>© {new Date().getFullYear()} {content.name}</span>
-        <span>SHOPIFY · PERFORMANCE · GROWTH</span>
-        <a href="/admin">CONTENT STUDIO <ArrowUpRight size={13} aria-hidden="true" /></a>
+        <span>{editorial.footerTagline}</span>
+        <a href="/admin">{editorial.studioLabel} <ArrowUpRight size={13} aria-hidden="true" /></a>
       </footer>
     </div>
   );

@@ -58,6 +58,33 @@ describe("portfolio admin router", () => {
     expect(publicSite.caseStudies).toHaveLength(3);
   });
 
+  it("saves editorial labels, credibility stats, and timeline entries through the verified content workflow", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    await caller.ownerVerification.verifyPin({ pin: process.env.ADMIN_OWNER_PIN!, phone: process.env.ADMIN_OWNER_PHONE! });
+    await caller.portfolio.admin.initialize();
+    const content = await caller.portfolio.admin.content.get();
+    const nextContent = {
+      ...content,
+      editorial: {
+        ...content.editorial,
+        heroKicker: "COMMERCE, WITH INTENT",
+        stats: content.editorial.stats.map((stat, index) => index === 0 ? { ...stat, value: "07" } : stat),
+      },
+      journey: content.journey.map((entry, index) => index === 0 ? { ...entry, track: "Studio" } : entry),
+    };
+
+    try {
+      await expect(caller.portfolio.admin.content.update(nextContent)).resolves.toEqual(nextContent);
+      const publicSite = await caller.portfolio.public.site();
+
+      expect(publicSite.content.editorial.heroKicker).toBe("COMMERCE, WITH INTENT");
+      expect(publicSite.content.editorial.stats[0]?.value).toBe("07");
+      expect(publicSite.content.journey[0]?.track).toBe("Studio");
+    } finally {
+      await caller.portfolio.admin.content.update(content);
+    }
+  });
+
   it("accepts the configured application-managed owner PIN through the verification endpoint", async () => {
     const pin = process.env.ADMIN_OWNER_PIN;
     const phone = process.env.ADMIN_OWNER_PHONE;

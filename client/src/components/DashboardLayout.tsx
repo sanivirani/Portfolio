@@ -85,6 +85,7 @@ export default function DashboardLayout({
 
   return (
     <SidebarProvider
+      className="min-h-screen bg-[#080808] text-zinc-100"
       style={
         {
           "--sidebar-width": `${sidebarWidth}px`,
@@ -157,7 +158,7 @@ function DashboardLayoutContent({
       <div className="relative" ref={sidebarRef}>
         <Sidebar
           collapsible="icon"
-          className="border-r-0"
+          className="border-r border-white/10 bg-[#0d0d0d] text-zinc-100"
           disableTransition={isResizing}
         >
           <SidebarHeader className="h-16 justify-center">
@@ -243,9 +244,9 @@ function DashboardLayoutContent({
         />
       </div>
 
-      <SidebarInset>
+      <SidebarInset className="min-w-0 bg-[#080808] text-zinc-100">
         {isMobile && (
-          <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
+          <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/10 bg-[#0d0d0d]/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
               <div className="flex items-center gap-3">
@@ -258,7 +259,7 @@ function DashboardLayoutContent({
             </div>
           </div>
         )}
-        <main className="flex-1 p-4">{children}</main>
+        <main className="min-w-0 flex-1 p-0">{children}</main>
       </SidebarInset>
     </>
   );
