@@ -31,4 +31,8 @@
 - [x] Diagnose why Content Studio renders with browser-default styles and restore the intended admin design system.
 - [x] Verify the Content Studio at desktop and mobile widths with owner-confirmation controls laid out correctly.
 - [x] Record verified Content Studio layout findings: desktop shows the complete navigation rail, editorial dashboard, statistics grid, and case-study action without overflow; mobile collapses navigation to a compact header and stacks the statistics and action card into a readable single-column layout.
-- [ ] Run checks and publish the repaired Content Studio rendering.
+- [x] Run checks and publish the repaired Content Studio rendering.
+- [x] Assess the Express, tRPC, authentication, storage, and database boundaries for Vercel compatibility.
+- [x] Add a Vercel serverless entrypoint, SPA fallback routing, and deployment configuration without changing the Manus runtime path.
+- [x] Write Vercel setup instructions covering required environment variables, OAuth callback URLs, database connection requirements, and post-deployment validation.
+- [ ] Validate the production build and serverless entrypoint, then checkpoint the Vercel-ready repository changes.
