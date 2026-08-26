@@ -1,6 +1,6 @@
 # Vercel Deployment Guide
 
-This repository now has a Vercel-ready build configuration. It separates the Vite client build from the Express application and exports a single serverless entrypoint for the existing same-origin API endpoints. The configured fallback makes client-side routes such as `/admin` resolve to the Vite application after a refresh.
+This repository now has a Vercel-ready build configuration. It separates the Vite client build from the Express application and exports a single serverless entrypoint for the existing same-origin API endpoints. The configured fallback excludes `/api/*` so API requests reach the Vercel Function, while client-side routes such as `/admin` resolve to the Vite application after a refresh.
 
 > **Important:** The current Manus deployment remains the recommended live environment until the external database, OAuth callback, and media migration steps below are complete. The project currently uses Manus services for its published media and OAuth integration.
 
@@ -81,6 +81,17 @@ Test the following in the Preview deployment before assigning a production domai
 4. Verify the Content Studio owner confirmation, a content save, the resume download, and every media asset.
 
 Use `vercel env pull` after linking a local clone to fetch Development settings for local Vercel testing.[2]
+
+### Local Vercel runtime check
+
+From a terminal that has a persisted Vercel CLI login, run the following after importing the repository into Vercel:
+
+```bash
+vercel login
+vercel dev --listen 3101
+```
+
+Then confirm `http://localhost:3101/api/oauth/callback` returns the application's JSON validation response (HTTP `400` when no `code` and `state` are supplied), and refresh `http://localhost:3101/admin` to confirm the SPA fallback. If the CLI reports that it is logged out, rerun `vercel login` and complete the device authorization in the **same terminal session** before starting `vercel dev`.
 
 ## References
 

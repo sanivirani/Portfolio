@@ -35,4 +35,8 @@
 - [x] Assess the Express, tRPC, authentication, storage, and database boundaries for Vercel compatibility.
 - [x] Add a Vercel serverless entrypoint, SPA fallback routing, and deployment configuration without changing the Manus runtime path.
 - [x] Write Vercel setup instructions covering required environment variables, OAuth callback URLs, database connection requirements, and post-deployment validation.
-- [ ] Validate the production build and serverless entrypoint, then checkpoint the Vercel-ready repository changes.
+- [x] Confirm that Vercel API function routing is preserved ahead of the SPA fallback rewrite.
+- [x] Run an equivalent local test against the default-exported serverless application and verify the API function.
+- [x] Run an equivalent local deployment-contract test that verifies a client-side deep link resolves through the SPA fallback.
+- [x] Document the Vercel CLI command that must be rerun from a terminal with persisted Vercel authorization.
+- [ ] Save a final checkpoint after Vercel runtime validation succeeds.

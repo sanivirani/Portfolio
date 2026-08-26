@@ -13,7 +13,7 @@
       "destination": "https://sanivfolio-jxuzqthb.manus.space/manus-storage/:path*"
     },
     {
-      "source": "/(.*)",
+      "source": "/:path((?!api/).*)",
       "destination": "/index.html"
     }
   ]
