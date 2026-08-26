@@ -19,5 +19,7 @@
 - [x] Refine project-card and resume-download hover states with subtle, responsive interaction feedback.
 - [x] Add an accessible Copy Email control beside the Download Resume action with copied-state feedback when an email is configured.
 - [x] Add technology and role category filtering using both project scopes and supplied role metadata, including a purposeful no-results state.
-- [ ] Extend deterministic content tests for the role-aware filter configuration, validate the live interactions at desktop and mobile widths, and checkpoint the finished enhancement.
+- [x] Extend deterministic content tests for the role-aware filter configuration, validate the live interactions at desktop and mobile widths, and checkpoint the finished enhancement.
 - [x] Keep the Copy Email control unavailable until the user supplies a contact email, as requested.
+- [x] Strengthen the project-card hover lift and add a soft drop shadow while preserving the dark editorial aesthetic.
+- [ ] Validate the hover refinement at desktop and mobile widths, run checks, and checkpoint the published update.
