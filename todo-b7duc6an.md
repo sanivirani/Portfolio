@@ -15,4 +15,9 @@
 - [x] Add a clearly labeled Download Resume control in the contact CTA that downloads a PDF portfolio document.
 - [x] Add subtle, reduced-motion-safe scroll-triggered fade-in treatment to project cards and the experience section.
 - [x] Extend Vitest coverage where deterministic navigation or downloadable asset configuration changes.
-- [ ] Validate the new interaction and download control at desktop and mobile widths, then checkpoint the published enhancement.
+- [x] Validate the new interaction and download control at desktop and mobile widths, then checkpoint the published enhancement.
+- [x] Refine project-card and resume-download hover states with subtle, responsive interaction feedback.
+- [x] Add an accessible Copy Email control beside the Download Resume action with copied-state feedback when an email is configured.
+- [x] Add technology and role category filtering using both project scopes and supplied role metadata, including a purposeful no-results state.
+- [ ] Extend deterministic content tests for the role-aware filter configuration, validate the live interactions at desktop and mobile widths, and checkpoint the finished enhancement.
+- [x] Keep the Copy Email control unavailable until the user supplies a contact email, as requested.

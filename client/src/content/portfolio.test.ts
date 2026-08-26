@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   defaultSiteSettings,
   editorialProjectCards,
+  getProjectCategories,
+  getProjectFilters,
   hasCorePortfolioSections,
   portfolioContent,
   portfolioNavigation,
   portfolioResume,
   portfolioStats,
+  projectMatchesFilters,
 } from "./portfolio";
 
 describe("portfolio homepage content", () => {
@@ -45,6 +48,29 @@ describe("portfolio homepage content", () => {
       url: "/manus-storage/sani-virani-portfolio_ae25af02.pdf",
       filename: "Sani-Virani-Portfolio.pdf",
     });
+  });
+
+  it("derives usable technology and role filters from the supplied project scopes", () => {
+    expect(getProjectCategories(portfolioContent.work)).toEqual([
+      "Shopify", "Ecommerce", "Development", "Performance Marketing", "Analytics",
+    ]);
+  });
+
+  it("matches work against combined technology and role filters", () => {
+    const work = [
+      { scope: ["Shopify", "Ecommerce"], role: "Shopify Developer + Performance Marketer" },
+      { scope: ["Analytics"], role: "Growth Analyst" },
+    ];
+    expect(getProjectFilters(work)).toEqual([
+      { key: "technology:Shopify", label: "Shopify", kind: "Technology" },
+      { key: "technology:Ecommerce", label: "Ecommerce", kind: "Technology" },
+      { key: "technology:Analytics", label: "Analytics", kind: "Technology" },
+      { key: "role:Shopify Developer", label: "Shopify Developer", kind: "Role" },
+      { key: "role:Performance Marketer", label: "Performance Marketer", kind: "Role" },
+      { key: "role:Growth Analyst", label: "Growth Analyst", kind: "Role" },
+    ]);
+    expect(projectMatchesFilters(work[0], ["technology:Shopify", "role:Performance Marketer"])).toBe(true);
+    expect(projectMatchesFilters(work[0], ["technology:Analytics"])).toBe(false);
   });
 
   it("makes the supplied LinkedIn and GitHub links available to the managed contact area", () => {

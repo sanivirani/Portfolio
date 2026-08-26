@@ -5,7 +5,9 @@ import {
   ArrowUpRight,
   Box,
   BriefcaseBusiness,
+  Check,
   Code2,
+  Copy,
   FileDown,
   Globe2,
   Linkedin,
@@ -18,10 +20,12 @@ import {
 import {
   defaultSiteSettings,
   editorialProjectCards,
+  getProjectFilters,
   portfolioContent,
   portfolioNavigation,
   portfolioResume,
   portfolioStats,
+  projectMatchesFilters,
 } from "@/content/portfolio";
 import { trpc } from "@/lib/trpc";
 
@@ -42,6 +46,8 @@ function getInitials(name: string) {
 
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [emailCopied, setEmailCopied] = useState(false);
   const { data: managedSite } = trpc.portfolio.public.site.useQuery();
 
   useEffect(() => {
@@ -82,8 +88,12 @@ export default function Home() {
         summary: item.description,
         focus: item.focus,
         scope: item.services,
+        role: item.role,
       }))
-    : portfolioContent.work;
+    : portfolioContent.work.map((item) => ({
+        ...item,
+        role: item.title === "Digiplexo Pvt. Ltd." ? "Shopify Developer + Performance Marketer" : "",
+      }));
   const roles = content.positioning.split(" · ");
   const contactHref = settings.contactEmail
     ? `mailto:${settings.contactEmail}?subject=Project%20enquiry%20for%20${encodeURIComponent(content.name)}`
@@ -97,8 +107,41 @@ export default function Home() {
       summary: "Independent engagements shaped around digital storefronts, acquisition, and the feedback loops between them.",
       focus: "Connected ecommerce practice",
       scope: ["Shopify", "Growth"],
+      role: "Independent Digital Projects",
     },
-  ].slice(0, 4);
+  ].slice(0, 4).map((project, cardIndex) => ({ ...project, cardIndex }));
+  const projectFilters = getProjectFilters(featuredWork);
+  const visibleWork = activeFilters.length === 0
+    ? featuredWork
+    : featuredWork.filter((project) => projectMatchesFilters(project, activeFilters));
+  const emailAddress = settings.contactEmail;
+
+  const toggleProjectFilter = (filterKey: string) => {
+    setActiveFilters((filters) => filters.includes(filterKey)
+      ? filters.filter((key) => key !== filterKey)
+      : [...filters, filterKey]);
+  };
+
+  const copyEmail = async () => {
+    if (!emailAddress) return;
+
+    try {
+      await navigator.clipboard.writeText(emailAddress);
+    } catch {
+      const input = document.createElement("textarea");
+      input.value = emailAddress;
+      input.setAttribute("readonly", "");
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      input.remove();
+    }
+
+    setEmailCopied(true);
+    window.setTimeout(() => setEmailCopied(false), 1800);
+  };
 
   return (
     <div className="portfolio-shell">
@@ -197,11 +240,22 @@ export default function Home() {
             <div><p>SELECTED<br />PROJECTS <ArrowUpRight size={16} aria-hidden="true" /></p></div>
             <a href="#contact">EXPLORE A PROJECT <ArrowRight size={17} aria-hidden="true" /></a>
           </div>
+          <div className="project-filter" aria-label="Filter projects by technology or role">
+            <span>FILTER BY</span>
+            <div className="project-filter__controls" role="group" aria-label="Project categories">
+              <button type="button" className={activeFilters.length === 0 ? "is-active" : ""} aria-pressed={activeFilters.length === 0} onClick={() => setActiveFilters([])}>ALL WORK</button>
+              {projectFilters.map((filter) => (
+                <button type="button" className={activeFilters.includes(filter.key) ? "is-active" : ""} aria-pressed={activeFilters.includes(filter.key)} onClick={() => toggleProjectFilter(filter.key)} key={filter.key}>
+                  {filter.kind === "Role" ? "ROLE · " : ""}{filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="project-grid">
-            {featuredWork.map((project, index) => {
-              const treatment = editorialProjectCards[index];
+            {visibleWork.map((project) => {
+              const treatment = editorialProjectCards[project.cardIndex];
               return (
-                <article className={`project-card project-card--${treatment.visual}`} data-reveal key={`${project.title}-${index}`}>
+                <article className={`project-card project-card--${treatment.visual}`} data-reveal key={`${project.title}-${project.cardIndex}`}>
                   <a href="#contact" aria-label={`Discuss a project similar to ${project.title}`}>
                     <div className="project-card__image" aria-hidden="true">
                       {treatment.visual === "jewelry" && <img src={assetUrls.jewelry} alt="" />}
@@ -210,7 +264,7 @@ export default function Home() {
                       {treatment.visual === "monogram" && <div className="monogram-art"><span>SV</span><i /></div>}
                     </div>
                     <div className="project-card__copy">
-                      <span className="project-number">0{index + 1}</span>
+                      <span className="project-number">0{project.cardIndex + 1}</span>
                       <div><h3>{project.title}</h3><p>{project.label || treatment.category}</p></div>
                       <ArrowUpRight size={17} aria-hidden="true" />
                     </div>
@@ -219,6 +273,7 @@ export default function Home() {
               );
             })}
           </div>
+          {visibleWork.length === 0 && <p className="project-empty" role="status">No project matches this combination. Remove a filter or choose All Work to explore the full portfolio.</p>}
           <p className="work-note">Project descriptions reflect the supplied portfolio record; outcomes are discussed from verified project data only.</p>
         </section>
 
@@ -273,7 +328,13 @@ export default function Home() {
             <a href={settings.linkedinUrl} target="_blank" rel="noreferrer"><Linkedin size={17} aria-hidden="true" />linkedin.com/in/sanivirani</a>
             <a href="https://github.com/" target="_blank" rel="noreferrer"><Code2 size={17} aria-hidden="true" />github.com</a>
             <span><Globe2 size={17} aria-hidden="true" />Worldwide / Remote</span>
-            <a className="resume-download" href={portfolioResume.url} download={portfolioResume.filename}><FileDown size={16} aria-hidden="true" />DOWNLOAD RESUME</a>
+            <div className="contact-actions">
+              <a className="contact-action resume-download" href={portfolioResume.url} download={portfolioResume.filename}><FileDown size={16} aria-hidden="true" />DOWNLOAD RESUME</a>
+              <button className={`contact-action copy-email${emailCopied ? " is-copied" : ""}`} type="button" onClick={copyEmail} disabled={!emailAddress} aria-label={emailAddress ? "Copy email address" : "Email address is not configured"}>
+                {emailCopied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}{emailCopied ? "EMAIL COPIED" : emailAddress ? "COPY EMAIL" : "EMAIL UNAVAILABLE"}
+              </button>
+            </div>
+            <span className="copy-status" aria-live="polite">{emailCopied ? "Email address copied to clipboard." : ""}</span>
           </div>
           <div className="contact-portrait"><img src={assetUrls.portrait} alt="" /><a href={contactHref} aria-label="Start a project conversation"><ArrowUpRight size={24} /></a><span className="thank-you">Thank you</span></div>
         </section>
