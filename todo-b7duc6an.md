@@ -28,3 +28,7 @@
 - [x] Add or update tests for the extended editable-content contract and admin mutations.
 - [x] Validate the repaired Content Studio through automated content-contract checks and verify public-site compatibility, then checkpoint the published update.
 - [x] Record the authenticated Content Studio visual review as deferred at the user’s request.
+- [x] Diagnose why Content Studio renders with browser-default styles and restore the intended admin design system.
+- [x] Verify the Content Studio at desktop and mobile widths with owner-confirmation controls laid out correctly.
+- [x] Record verified Content Studio layout findings: desktop shows the complete navigation rail, editorial dashboard, statistics grid, and case-study action without overflow; mobile collapses navigation to a compact header and stacks the statistics and action card into a readable single-column layout.
+- [ ] Run checks and publish the repaired Content Studio rendering.
