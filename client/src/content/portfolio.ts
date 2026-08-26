@@ -23,6 +23,11 @@ export const portfolioStats = [
   { value: "01", label: ["INTEGRATED", "APPROACH"] },
 ] as const;
 
+export const portfolioResume = {
+  url: "/manus-storage/sani-virani-portfolio_ae25af02.pdf",
+  filename: "Sani-Virani-Portfolio.pdf",
+} as const;
+
 export const editorialProjectCards = [
   { visual: "jewelry", category: "ECOMMERCE" },
   { visual: "type", category: "WEBSITE DEVELOPMENT" },

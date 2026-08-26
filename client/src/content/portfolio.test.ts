@@ -5,6 +5,7 @@ import {
   hasCorePortfolioSections,
   portfolioContent,
   portfolioNavigation,
+  portfolioResume,
   portfolioStats,
 } from "./portfolio";
 
@@ -37,6 +38,13 @@ describe("portfolio homepage content", () => {
   it("uses evidence-based credibility markers and four editorial project slots", () => {
     expect(portfolioStats.map((stat) => stat.value)).toEqual(["04", "03", "05", "01"]);
     expect(editorialProjectCards).toHaveLength(4);
+  });
+
+  it("provides a stable managed-download configuration for the portfolio PDF", () => {
+    expect(portfolioResume).toEqual({
+      url: "/manus-storage/sani-virani-portfolio_ae25af02.pdf",
+      filename: "Sani-Virani-Portfolio.pdf",
+    });
   });
 
   it("makes the supplied LinkedIn and GitHub links available to the managed contact area", () => {

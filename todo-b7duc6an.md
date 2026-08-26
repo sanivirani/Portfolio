@@ -11,4 +11,8 @@
 - [x] Add polished, reduced-motion-safe visual transitions and keyboard-visible focus states.
 - [x] Add or update Vitest coverage for deterministic portfolio content and navigation behavior.
 - [x] Run type checks and tests, and inspect desktop and mobile visual output.
-- [ ] Save the final checkpoint for the completed implementation.
+- [x] Save the final checkpoint for the completed implementation.
+- [x] Add a clearly labeled Download Resume control in the contact CTA that downloads a PDF portfolio document.
+- [x] Add subtle, reduced-motion-safe scroll-triggered fade-in treatment to project cards and the experience section.
+- [x] Extend Vitest coverage where deterministic navigation or downloadable asset configuration changes.
+- [ ] Validate the new interaction and download control at desktop and mobile widths, then checkpoint the published enhancement.

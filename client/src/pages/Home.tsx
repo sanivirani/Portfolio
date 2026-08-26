@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowDownRight,
   ArrowRight,
@@ -6,6 +6,7 @@ import {
   Box,
   BriefcaseBusiness,
   Code2,
+  FileDown,
   Globe2,
   Linkedin,
   Mail,
@@ -19,6 +20,7 @@ import {
   editorialProjectCards,
   portfolioContent,
   portfolioNavigation,
+  portfolioResume,
   portfolioStats,
 } from "@/content/portfolio";
 import { trpc } from "@/lib/trpc";
@@ -41,6 +43,33 @@ function getInitials(name: string) {
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { data: managedSite } = trpc.portfolio.public.site.useQuery();
+
+  useEffect(() => {
+    const revealTargets = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    revealTargets.forEach((target) => target.classList.add("reveal-ready"));
+
+    if (reduceMotion || !("IntersectionObserver" in window)) {
+      revealTargets.forEach((target) => target.classList.add("is-visible"));
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        });
+      },
+      { threshold: 0.16, rootMargin: "0px 0px -32px" },
+    );
+
+    revealTargets.forEach((target) => observer.observe(target));
+    return () => observer.disconnect();
+  }, []);
+
   const content = managedSite?.content ?? {
     ...portfolioContent,
     process: portfolioContent.process.map(([number, title, description]) => ({ number, title, description })),
@@ -172,7 +201,7 @@ export default function Home() {
             {featuredWork.map((project, index) => {
               const treatment = editorialProjectCards[index];
               return (
-                <article className={`project-card project-card--${treatment.visual}`} key={`${project.title}-${index}`}>
+                <article className={`project-card project-card--${treatment.visual}`} data-reveal key={`${project.title}-${index}`}>
                   <a href="#contact" aria-label={`Discuss a project similar to ${project.title}`}>
                     <div className="project-card__image" aria-hidden="true">
                       {treatment.visual === "jewelry" && <img src={assetUrls.jewelry} alt="" />}
@@ -212,7 +241,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="experience-section page-width" id="experience" aria-labelledby="experience-title">
+        <section className="experience-section page-width" id="experience" aria-labelledby="experience-title" data-reveal>
           <div className="experience-list">
             <div className="experience-list__heading"><h2 id="experience-title">EXPERIENCE<br />&amp; PRACTICE</h2><ArrowRight size={18} aria-hidden="true" /></div>
             <ol>
@@ -244,6 +273,7 @@ export default function Home() {
             <a href={settings.linkedinUrl} target="_blank" rel="noreferrer"><Linkedin size={17} aria-hidden="true" />linkedin.com/in/sanivirani</a>
             <a href="https://github.com/" target="_blank" rel="noreferrer"><Code2 size={17} aria-hidden="true" />github.com</a>
             <span><Globe2 size={17} aria-hidden="true" />Worldwide / Remote</span>
+            <a className="resume-download" href={portfolioResume.url} download={portfolioResume.filename}><FileDown size={16} aria-hidden="true" />DOWNLOAD RESUME</a>
           </div>
           <div className="contact-portrait"><img src={assetUrls.portrait} alt="" /><a href={contactHref} aria-label="Start a project conversation"><ArrowUpRight size={24} /></a><span className="thank-you">Thank you</span></div>
         </section>
