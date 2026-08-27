@@ -3,14 +3,14 @@
   "buildCommand": "pnpm build:client",
   "outputDirectory": "dist/public",
   "functions": {
-    "api/[...path].mjs": {
+    "api/[...path].cjs": {
       "maxDuration": 30
     }
   },
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "/api/[...path].mjs"
+      "destination": "/api/[...path].cjs"
     },
     {
       "source": "/manus-storage/:path*",
