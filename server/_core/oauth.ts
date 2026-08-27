@@ -7,7 +7,7 @@ import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { ENV } from "./env";
 import { sdk } from "./sdk";
-import { contentStudioLoginHrefForOrigin } from "../../shared/contentStudioRouting";
+import { CONTENT_STUDIO_PRODUCTION_ORIGIN } from "../../shared/contentStudioRouting";
 
 type GitHubUser = {
   id: number;
@@ -65,9 +65,8 @@ function validCallbackState(req: Request, state: string) {
 export function registerOAuthRoutes(app: Express) {
   app.get("/api/oauth/github", (req, res) => {
     if (!ENV.githubOauthClientId) {
-      const productionLoginUrl = contentStudioLoginHrefForOrigin(requestOrigin(req));
-      if (productionLoginUrl !== "/api/oauth/github") {
-        res.redirect(302, productionLoginUrl);
+      if (requestOrigin(req) !== CONTENT_STUDIO_PRODUCTION_ORIGIN) {
+        res.redirect(302, `${CONTENT_STUDIO_PRODUCTION_ORIGIN}/api/oauth/github`);
         return;
       }
       missingGitHubConfiguration(res);

@@ -17244,14 +17244,14 @@ var require_parseurl = __commonJS({
       if (typeof str !== "string" || str.charCodeAt(0) !== 47) {
         return parse3(str);
       }
-      var pathname2 = str;
+      var pathname = str;
       var query = null;
       var search = null;
       for (var i = 1; i < str.length; i++) {
         switch (str.charCodeAt(i)) {
           case 63:
             if (search === null) {
-              pathname2 = str.substring(0, i);
+              pathname = str.substring(0, i);
               query = str.substring(i + 1);
               search = str.substring(i);
             }
@@ -17276,7 +17276,7 @@ var require_parseurl = __commonJS({
       var url4 = Url !== void 0 ? new Url() : {};
       url4.path = str;
       url4.href = str;
-      url4.pathname = pathname2;
+      url4.pathname = pathname;
       if (search !== null) {
         url4.query = query;
         url4.search = search;
@@ -21980,8 +21980,8 @@ var require_response = __commonJS({
       if (!opts.root && !isAbsolute(path2)) {
         throw new TypeError("path must be absolute or specify root to res.sendFile");
       }
-      var pathname2 = encodeURI(path2);
-      var file2 = send(req, pathname2, opts);
+      var pathname = encodeURI(path2);
+      var file2 = send(req, pathname, opts);
       sendfile(res2, file2, opts, function(err) {
         if (done) return done(err);
         if (err && err.code === "EISDIR") return next();
@@ -45247,7 +45247,7 @@ var require_lib4 = __commonJS({
         return this.searchParams;
       }
       [Symbol.for("nodejs.util.inspect.custom")]() {
-        const { href, origin: origin2, protocol, username, password, hosts, pathname: pathname2, search, searchParams, hash: hash2 } = this;
+        const { href, origin: origin2, protocol, username, password, hosts, pathname, search, searchParams, hash: hash2 } = this;
         return {
           href,
           origin: origin2,
@@ -45255,7 +45255,7 @@ var require_lib4 = __commonJS({
           username,
           password,
           hosts,
-          pathname: pathname2,
+          pathname,
           search,
           searchParams,
           hash: hash2
@@ -65941,22 +65941,6 @@ var sdk = new SessionService();
 
 // shared/contentStudioRouting.ts
 var CONTENT_STUDIO_PRODUCTION_ORIGIN = "https://portfolio-henna-nu-35.vercel.app";
-var isManusPreviewHost = (hostname3) => hostname3.endsWith(".manus.space") || hostname3.endsWith(".manus.computer");
-function pathname(path) {
-  return path.startsWith("/") ? path : `/${path}`;
-}
-function contentStudioHrefForOrigin(origin2, path = "/admin") {
-  const targetPath = pathname(path);
-  try {
-    const hostname3 = new URL(origin2).hostname;
-    return isManusPreviewHost(hostname3) ? `${CONTENT_STUDIO_PRODUCTION_ORIGIN}${targetPath}` : targetPath;
-  } catch {
-    return targetPath;
-  }
-}
-function contentStudioLoginHrefForOrigin(origin2) {
-  return contentStudioHrefForOrigin(origin2, "/api/oauth/github");
-}
 
 // server/_core/oauth.ts
 function requestOrigin(req) {
@@ -65993,9 +65977,8 @@ function validCallbackState(req, state) {
 function registerOAuthRoutes(app) {
   app.get("/api/oauth/github", (req, res) => {
     if (!ENV.githubOauthClientId) {
-      const productionLoginUrl = contentStudioLoginHrefForOrigin(requestOrigin(req));
-      if (productionLoginUrl !== "/api/oauth/github") {
-        res.redirect(302, productionLoginUrl);
+      if (requestOrigin(req) !== CONTENT_STUDIO_PRODUCTION_ORIGIN) {
+        res.redirect(302, `${CONTENT_STUDIO_PRODUCTION_ORIGIN}/api/oauth/github`);
         return;
       }
       missingGitHubConfiguration(res);
