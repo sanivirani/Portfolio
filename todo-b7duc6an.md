@@ -39,4 +39,12 @@
 - [x] Run an equivalent local test against the default-exported serverless application and verify the API function.
 - [x] Run an equivalent local deployment-contract test that verifies a client-side deep link resolves through the SPA fallback.
 - [x] Document the Vercel CLI command that must be rerun from a terminal with persisted Vercel authorization.
-- [ ] Save a final checkpoint after Vercel runtime validation succeeds.
+- [x] Save a final checkpoint after Vercel runtime validation succeeds.
+- [x] Confirm the user-created GitHub destination as `sanivirani/Portfolio`.
+- [x] Confirm that the Vercel-ready project may be uploaded to the currently public `sanivirani/Portfolio` repository.
+- [x] Document that the configured GitHub credential has no OAuth scopes and was denied both repository creation and push access.
+- [x] Confirm that the first repository token passes a REST read-permission check but is rejected by Git push.
+- [x] Verify the currently configured GitHub export credential has Git-over-HTTPS write access to `sanivirani/Portfolio`.
+- [x] Export the Vercel-ready project to the selected GitHub repository.
+- [ ] Checkpoint the GitHub credential-validation test and synchronize the resulting latest commit to `sanivirani/Portfolio`.
+- [ ] Verify the synchronized repository export and provide the Vercel import handoff.
