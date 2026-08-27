@@ -69,13 +69,13 @@
 - [x] Verify the live Vercel OAuth callback response headers and JSON payload for missing parameters, and correct the response if it differs from the documented contract.
 - [x] Provide a beginner-friendly, from-scratch MongoDB Atlas and Vercel connection guide tailored to this Portfolio project.
 - [x] Audit the existing Vercel and OAuth configuration required to enable Content Studio sign-in and owner verification.
-- [ ] Add the required GitHub OAuth, session-signing, and owner-authorization values to Vercel securely for Production; defer Preview login until a stable Preview callback URL is selected.
-- [ ] Register the Vercel production OAuth callback and redeploy with Content Studio authentication enabled.
-- [ ] Verify Content Studio sign-in, owner confirmation, and an authorized content-save operation in Vercel production.
+- [x] Add the required GitHub OAuth, session-signing, and owner-authorization values to Vercel securely for Production; defer Preview login until a stable Preview callback URL is selected.
+- [x] Register the Vercel production OAuth callback and redeploy with Content Studio authentication enabled.
+- [x] Verify Content Studio sign-in, owner confirmation, and an authorized content-save operation in Vercel production.
 - [x] Replace the Manus-specific Content Studio OAuth flow with GitHub OAuth while preserving secure state validation and session handling.
 - [x] Restrict Content Studio administrator access to the approved GitHub account identity rather than exposing an open GitHub login.
 - [x] Create a GitHub OAuth application, register the Vercel production callback, and add the resulting client configuration to Vercel without committing secrets.
-- [ ] Rotate the currently exposed GitHub OAuth client secret and JWT secret, then securely replace their Vercel Production values before deployment.
-- [ ] Document that GitHub OAuth remains intentionally unconfigured for Preview until a stable Preview callback URL is selected.
-- [ ] Diagnose the live GitHub OAuth callback error that occurred after user authorization and identify whether the rotated Vercel secret or server implementation is at fault.
-- [ ] Correct the live GitHub OAuth callback failure, redeploy, and verify that the authorized administrator returns to `/admin` with an active session.
+- [x] Rotate the currently exposed GitHub OAuth client secret and JWT secret, then securely replace their Vercel Production values before deployment.
+- [x] Document that GitHub OAuth remains intentionally unconfigured for Preview until a stable Preview callback URL is selected.
+- [x] Diagnose the live GitHub OAuth callback error that occurred after user authorization and identify whether the rotated Vercel secret or server implementation is at fault.
+- [x] Correct the live GitHub OAuth callback failure, redeploy, and verify that the authorized administrator returns to `/admin` with an active session.

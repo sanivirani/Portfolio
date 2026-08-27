@@ -8,7 +8,9 @@
 - The current correction emits `api/[...path].js` as a bundled CommonJS function. The `api/package.json` boundary sets `type` to `commonjs`, while the project build regenerates the bundle before Vite produces `dist/public`.
 - MongoDB Atlas was connected through the Portfolio project’s Vercel integration. Vercel lists a masked `MONGODB_URI` environment variable for both Production and Preview.
 - Redeployment `FPp9MAnHZqW1vYkrJhnGLoyBcuFy` completed successfully. A direct production request to `portfolio.public.site` returned the portfolio payload, confirming that the Vercel function can read through the Atlas-backed persistence path.
-- The current Vercel project environment list contains `MONGODB_URI` only. OAuth, session-signing, and owner-verification variables have not yet been added, so public-site persistence is connected but Content Studio login and owner-gated editing cannot yet be verified.
+- The GitHub OAuth deployment initially reached GitHub consent but then failed in the callback because MongoDB rejected the user upsert: the same profile properties, including `name`, were present in both `$set` and `$setOnInsert`.
+- Commit `861ed351` resolves that conflict by constructing mutually exclusive `$set` and `$setOnInsert` field sets, with a regression test that asserts no duplicate update paths. The deployed `/api/oauth/github` endpoint redirects with only `read:user`, its parameterless callback still returns HTTP `400`, and an approved `sanivirani` sign-in now returns to Content Studio successfully.
+- The authenticated owner workflow was verified in Production: an authorized Content Studio content change persisted through MongoDB, the original content was restored, and logout returned `/admin` to its sign-in gate. GitHub OAuth variables are intentionally Production-only; Preview login remains unconfigured until a stable Preview callback domain is selected.
 
 ## Official references consulted
 

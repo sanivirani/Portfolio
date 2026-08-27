@@ -64310,9 +64310,8 @@ function parseJson(value, fallback) {
 function isDuplicateEntry(error46) {
   return error46 instanceof import_mongodb.MongoServerError && error46.code === 11e3 || typeof error46 === "object" && error46 !== null && "code" in error46 && error46.code === 11e3;
 }
-async function upsertUser(user) {
+function buildUserUpsertUpdate(user, id, now) {
   if (!user.openId) throw new Error("User openId is required for upsert");
-  const now = /* @__PURE__ */ new Date();
   const updates = {
     lastSignedIn: user.lastSignedIn ?? now,
     updatedAt: now
@@ -64321,7 +64320,25 @@ async function upsertUser(user) {
   if (user.email !== void 0) updates.email = user.email ?? null;
   if (user.loginMethod !== void 0) updates.loginMethod = user.loginMethod ?? null;
   if (user.role) updates.role = user.role;
+  const insertDefaults = {
+    id,
+    openId: user.openId,
+    createdAt: now
+  };
+  if (updates.name === void 0) insertDefaults.name = null;
+  if (updates.email === void 0) insertDefaults.email = null;
+  if (updates.loginMethod === void 0) insertDefaults.loginMethod = null;
+  if (updates.role === void 0) {
+    insertDefaults.role = user.openId === ENV.ownerOpenId ? "admin" : "user";
+  }
+  return { updates, mongoUpdate: { $set: updates, $setOnInsert: insertDefaults } };
+}
+async function upsertUser(user) {
+  if (!user.openId) throw new Error("User openId is required for upsert");
+  const now = /* @__PURE__ */ new Date();
   if (isTestRuntime()) {
+    const id = nextTestId("users");
+    const { updates } = buildUserUpsertUpdate(user, id, now);
     const existing = testStore.users.get(user.openId);
     testStore.users.set(user.openId, {
       id: existing?.id ?? nextTestId("users"),
@@ -64339,21 +64356,11 @@ async function upsertUser(user) {
   }
   const db = await readyDb();
   if (!db) return;
-  const id = await nextMongoId(db, "users");
+  const mongoId = await nextMongoId(db, "users");
+  const update = buildUserUpsertUpdate(user, mongoId, now);
   await db.collection("users").updateOne(
     { openId: user.openId },
-    {
-      $set: updates,
-      $setOnInsert: {
-        id,
-        openId: user.openId,
-        name: null,
-        email: null,
-        loginMethod: null,
-        role: user.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "user"),
-        createdAt: now
-      }
-    },
+    update.mongoUpdate,
     { upsert: true }
   );
 }

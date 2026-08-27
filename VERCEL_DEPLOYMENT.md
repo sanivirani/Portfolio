@@ -2,7 +2,7 @@
 
 This repository has a Vercel-ready build configuration. It separates the Vite client build from the Express application and emits a self-contained CommonJS serverless entrypoint at `api/[...path].js` for the existing same-origin API endpoints. The `api/package.json` CommonJS boundary preserves Express dependency loading while keeping the artifact visible to Vercel as a standard JavaScript function. The configured fallback excludes `/api/*` so API requests reach the Vercel Function, while client-side routes such as `/admin` resolve to the Vite application after a refresh.
 
-> **Current status:** The public portfolio is live at `https://portfolio-henna-nu-35.vercel.app`. MongoDB Atlas is linked through Vercel for Production and Preview, and the public portfolio API has been verified against the Atlas-backed data path. GitHub OAuth is configured for the `sanivirani` administrator account; redeploy after the GitHub OAuth code is pushed. Existing images and the resume still use the temporary Manus media rewrite described in Section 5.
+> **Current status:** The public portfolio is live at `https://portfolio-henna-nu-35.vercel.app`. MongoDB Atlas is linked through Vercel for Production and Preview, and the public portfolio API has been verified against the Atlas-backed data path. GitHub OAuth has been verified for the `sanivirani` administrator: sign-in reaches Content Studio, owner-gated content saves persist in MongoDB, and logout clears the session. Existing images and the resume still use the temporary Manus media rewrite described in Section 5.
 
 ## 1. Import the repository
 
@@ -12,7 +12,7 @@ The first Vercel deployment becomes Production; later pushes to the production b
 
 ## 2. Add environment variables
 
-In **Vercel Project Settings → Environment Variables**, add the values below to **Production** and **Preview**. Do not commit `.env`, `.env.local`, or real secret values. Vercel applies variable changes only to newly created deployments, so redeploy after changing a value.[3]
+In **Vercel Project Settings → Environment Variables**, add `MONGODB_URI` to **Production** and **Preview**. Add the Content Studio OAuth and session values to **Production**. Preview GitHub login is intentionally not configured until there is a stable Preview callback domain. Do not commit `.env`, `.env.local`, or real secret values. Vercel applies variable changes only to newly created deployments, so redeploy after changing a value.[3]
 
 The repository intentionally does not include a committed `.env.example`, because its deployment tooling blocks environment files. Use the table below as the canonical template when creating variables in Vercel.
 
@@ -20,10 +20,10 @@ The repository intentionally does not include a committed `.env.example`, becaus
 |---|---:|---|---|
 | `MONGODB_URI` | Yes | Cached MongoDB Atlas client and Content Studio collections | Use the Atlas `mongodb+srv://…` connection URI. Add it as a secret, never in the browser bundle. |
 | `MONGODB_DB` | No | MongoDB database selection | Defaults to the database in `MONGODB_URI`, or `sani_portfolio` when no database name is present. |
-| `JWT_SECRET` | Content Studio only | First-party session signing and verification | Generate a long random secret; use the same value for all Production instances. |
-| `GITHUB_OAUTH_CLIENT_ID` | Content Studio only | Server-side GitHub authorization redirect | Client ID from the GitHub OAuth app. It is safe to treat this as configuration, but keeping it server-side avoids unnecessary browser exposure. |
-| `GITHUB_OAUTH_CLIENT_SECRET` | Content Studio only | GitHub authorization-code exchange | Generate this in GitHub, store it as a Vercel secret, and never commit or paste it into chat. |
-| `GITHUB_ADMIN_LOGIN` | Content Studio only | Administrator authorization | The exact GitHub username permitted to administer Content Studio, such as `sanivirani`. |
+| `JWT_SECRET` | Production Content Studio only | First-party session signing and verification | Generate a long random secret; use the same value for all Production instances. |
+| `GITHUB_OAUTH_CLIENT_ID` | Production Content Studio only | Server-side GitHub authorization redirect | Client ID from the GitHub OAuth app. It is safe to treat this as configuration, but keeping it server-side avoids unnecessary browser exposure. |
+| `GITHUB_OAUTH_CLIENT_SECRET` | Production Content Studio only | GitHub authorization-code exchange | Generate this in GitHub, store it as a Vercel secret, and never commit or paste it into chat. |
+| `GITHUB_ADMIN_LOGIN` | Production Content Studio only | Administrator authorization | The exact GitHub username permitted to administer Content Studio, such as `sanivirani`. |
 
 Vercel supports separate Local, Preview, and Production variable values; use a non-production database for Preview whenever possible.[2] [3]
 
@@ -55,7 +55,7 @@ Use `https://portfolio-henna-nu-35.vercel.app` as the homepage URL. The server r
 
 The GitHub OAuth app named **Sani Virani Content Studio** is already registered for this production URL. Add its Client ID as `GITHUB_OAUTH_CLIENT_ID`, generate a Client Secret and add it as `GITHUB_OAUTH_CLIENT_SECRET`, set `GITHUB_ADMIN_LOGIN` to `sanivirani`, and create `JWT_SECRET` as a Vercel secret. GitHub sign-in is accepted only when the returned GitHub username matches `GITHUB_ADMIN_LOGIN`, so it also functions as the owner verification factor. Do not add phone or PIN values unless you later elect to restore the separate legacy verification flow.
 
-For Preview deployments, add a separate GitHub OAuth callback URL only after choosing a stable Preview domain. Do not use a random preview URL as the production callback.
+For Preview deployments, GitHub OAuth is intentionally unconfigured until a stable Preview callback domain is selected and registered as a separate GitHub OAuth callback URL. Do not use a random Preview URL as the production callback.
 
 ## 5. Migrate media before fully leaving Manus
 
@@ -65,7 +65,7 @@ For a fully independent Vercel deployment, copy the portrait, project images, an
 
 ## 6. Deploy and verify
 
-After adding environment variables and registering OAuth, deploy from the Vercel dashboard or CLI:
+After adding or rotating Production variables, deploy from the Vercel dashboard or CLI:
 
 ```bash
 pnpm install
@@ -74,12 +74,7 @@ vercel
 vercel --prod
 ```
 
-Test the following in the Preview deployment before assigning a production domain:
-
-1. Open `/` and refresh `/admin` to verify SPA deep links.
-2. Confirm `/api/trpc` responds and the public portfolio loads its content.
-3. Sign in through GitHub using the configured administrator account and confirm the callback returns to `/admin` on the Vercel domain.
-4. Verify Content Studio can save an authorized change, then confirm the resume download and every media asset.
+On Production, verify that `/` and refreshed `/admin` load as expected, `/api/trpc` serves the public portfolio, and `/api/oauth/callback` returns HTTP `400` JSON when `code` and `state` are absent. Sign in through GitHub using the configured administrator account and confirm the callback returns to `/admin`. Verify that an authorized Content Studio save persists and that logout returns `/admin` to its sign-in screen. Preview should continue to operate as a public portfolio and must not offer GitHub Content Studio login until a stable Preview callback has been configured.
 
 Use `vercel env pull` after linking a local clone to fetch Development settings for local Vercel testing.[2]
 
