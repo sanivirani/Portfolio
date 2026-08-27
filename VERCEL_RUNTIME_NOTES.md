@@ -6,6 +6,9 @@
 - The first explicit catch-all function deployment (`0d101c7`) emitted an API resource but failed at runtime with `ERR_MODULE_NOT_FOUND` for `server/_core/app`, because the Vercel-generated ESM artifact retained an extensionless source import.
 - The second attempt (`5f6318a`) failed to build because Vercel did not recognize `api/[...path].cjs` as a function path in `functions` configuration.
 - The current correction emits `api/[...path].js` as a bundled CommonJS function. The `api/package.json` boundary sets `type` to `commonjs`, while the project build regenerates the bundle before Vite produces `dist/public`.
+- MongoDB Atlas was connected through the Portfolio project’s Vercel integration. Vercel lists a masked `MONGODB_URI` environment variable for both Production and Preview.
+- Redeployment `FPp9MAnHZqW1vYkrJhnGLoyBcuFy` completed successfully. A direct production request to `portfolio.public.site` returned the portfolio payload, confirming that the Vercel function can read through the Atlas-backed persistence path.
+- The current Vercel project environment list contains `MONGODB_URI` only. OAuth, session-signing, and owner-verification variables have not yet been added, so public-site persistence is connected but Content Studio login and owner-gated editing cannot yet be verified.
 
 ## Official references consulted
 

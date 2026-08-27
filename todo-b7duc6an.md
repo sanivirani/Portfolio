@@ -51,15 +51,17 @@
 - [x] Provide the verified GitHub repository URL and explain the remaining Vercel import or reconnection step.
 - [x] Inspect the connected Vercel account and confirm the available Portfolio import path.
 - [x] Create or reconnect the Vercel project to `sanivirani/Portfolio` with the checked-in serverless configuration.
-- [ ] Configure the required production environment variables, database connection, and OAuth callback before deployment.
-- [ ] Deploy, verify API and public-site behavior, and provide the Vercel production URL.
+- [x] Configure MongoDB Atlas for Vercel production and preview; defer OAuth/admin variables for Content Studio by user approval.
+- [x] Verify the public site and public API behavior, then provide the Vercel production URL.
 - [x] Assess replacing the current MySQL/TiDB and Drizzle data layer with MongoDB for Vercel deployment.
 - [x] Confirm whether to retain the current relational backend or approve a MongoDB migration before Vercel deployment.
-- [ ] If approved, configure MongoDB connectivity, migrate portfolio persistence, and update the Vercel environment requirements.
+- [x] If approved, configure MongoDB connectivity, migrate portfolio persistence, and update the Vercel environment requirements.
 - [x] Replace the Drizzle MySQL database helpers with a Vercel-safe cached MongoDB Atlas client and equivalent typed collection operations.
 - [x] Convert users, portfolio settings, media, case studies, and owner-verification persistence to MongoDB collections while preserving tRPC response contracts.
 - [x] Replace MySQL-specific tests, schema references, and Vercel instructions with MongoDB Atlas validation and setup guidance.
-- [ ] Configure `MONGODB_URI` and the remaining production variables in Vercel after the MongoDB Atlas cluster is ready.
+- [x] Configure `MONGODB_URI` in Vercel for Production and Preview; defer the remaining Content Studio authentication variables by user approval.
+- [x] Keep Content Studio sign-in and editing deferred until OAuth and private owner-verification variables are intentionally configured.
+- [x] Verify the user-reported MongoDB Atlas connection supplies `MONGODB_URI` to the Portfolio Vercel project before testing persistence.
 - [x] Complete the remaining Vercel import-form setup and explicitly confirm the project creation or reconnection state.
 - [x] After the Vercel project exists, verify the import settings match the checked-in contract: Vite, root `./`, build `pnpm build:client`, and output `dist/public`.
 - [x] Diagnose and correct the Vercel deployment so `/api/oauth/callback` is served by the serverless Express function instead of returning `404 NOT_FOUND`.

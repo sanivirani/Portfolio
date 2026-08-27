@@ -1,8 +1,8 @@
 # Vercel Deployment Guide
 
-This repository now has a Vercel-ready build configuration. It separates the Vite client build from the Express application and emits a self-contained CommonJS serverless entrypoint at `api/[...path].js` for the existing same-origin API endpoints. The `api/package.json` CommonJS boundary preserves Express dependency loading while keeping the artifact visible to Vercel as a standard JavaScript function. The configured fallback excludes `/api/*` so API requests reach the Vercel Function, while client-side routes such as `/admin` resolve to the Vite application after a refresh.
+This repository has a Vercel-ready build configuration. It separates the Vite client build from the Express application and emits a self-contained CommonJS serverless entrypoint at `api/[...path].js` for the existing same-origin API endpoints. The `api/package.json` CommonJS boundary preserves Express dependency loading while keeping the artifact visible to Vercel as a standard JavaScript function. The configured fallback excludes `/api/*` so API requests reach the Vercel Function, while client-side routes such as `/admin` resolve to the Vite application after a refresh.
 
-> **Important:** The current Manus deployment remains the recommended live environment until the external database, OAuth callback, and media migration steps below are complete. The project currently uses Manus services for its published media and OAuth integration.
+> **Current status:** The public portfolio is live at `https://portfolio-henna-nu-35.vercel.app`. MongoDB Atlas is linked through Vercel for Production and Preview, and the public portfolio API has been verified against the Atlas-backed data path. Content Studio sign-in and editing are deliberately deferred until the OAuth and owner-verification values in Section 4 are configured. Existing images and the resume still use the temporary Manus media rewrite described in Section 5.
 
 ## 1. Import the repository
 
@@ -20,13 +20,13 @@ The repository intentionally does not include a committed `.env.example`, becaus
 |---|---:|---|---|
 | `MONGODB_URI` | Yes | Cached MongoDB Atlas client and Content Studio collections | Use the Atlas `mongodb+srv://…` connection URI. Add it as a secret, never in the browser bundle. |
 | `MONGODB_DB` | No | MongoDB database selection | Defaults to the database in `MONGODB_URI`, or `sani_portfolio` when no database name is present. |
-| `JWT_SECRET` | Yes | Session signing and verification | Generate a long random secret; use the same value for all Production instances. |
-| `VITE_APP_ID` | Yes | Browser OAuth login start | OAuth application identifier. This value is visible in the client bundle. |
-| `VITE_OAUTH_PORTAL_URL` | Yes | Browser OAuth login start | OAuth portal base URL, without a trailing callback path. This value is visible in the client bundle. |
-| `OAUTH_SERVER_URL` | Yes | Server OAuth code exchange and profile lookup | OAuth provider API base URL. |
-| `OWNER_OPEN_ID` | Yes | Owner/admin role assignment | Stable owner identifier returned by the configured OAuth provider. |
-| `ADMIN_OWNER_PHONE` | Yes | Content Studio owner confirmation | Authorized phone value used by the existing local confirmation step. |
-| `ADMIN_OWNER_PIN` | Yes | Content Studio owner confirmation | A private PIN; rotate it if it has been exposed. |
+| `JWT_SECRET` | Content Studio only | Session signing and verification | Generate a long random secret; use the same value for all Production instances. |
+| `VITE_APP_ID` | Content Studio only | Browser OAuth login start | OAuth application identifier. This value is visible in the client bundle. |
+| `VITE_OAUTH_PORTAL_URL` | Content Studio only | Browser OAuth login start | OAuth portal base URL, without a trailing callback path. This value is visible in the client bundle. |
+| `OAUTH_SERVER_URL` | Content Studio only | Server OAuth code exchange and profile lookup | OAuth provider API base URL. |
+| `OWNER_OPEN_ID` | Content Studio only | Owner/admin role assignment | Stable owner identifier returned by the configured OAuth provider. |
+| `ADMIN_OWNER_PHONE` | Content Studio only | Content Studio owner confirmation | Authorized phone value used by the existing local confirmation step. |
+| `ADMIN_OWNER_PIN` | Content Studio only | Content Studio owner confirmation | A private PIN; rotate it if it has been exposed. |
 
 `VITE_*` variables are compiled into the browser build, so they must never contain database credentials, API keys, or other secrets. Vercel supports separate Local, Preview, and Production variable values; use a non-production database for Preview whenever possible.[2] [3]
 
@@ -47,6 +47,10 @@ Create a database user with `readWrite` access to the selected portfolio databas
 Vercel Functions use dynamic outbound IP addresses. When you connect Atlas directly, configure an Atlas IP Access List rule that permits Vercel connectivity. MongoDB documents that the Vercel integration uses `0.0.0.0/0` because of these dynamic addresses; this permits connections from anywhere, so use strong, unique database credentials and grant only the minimum database role.[5] [6]
 
 ## 4. Configure OAuth before enabling Content Studio
+
+### Public-only deployment mode
+
+The public portfolio does **not** require the OAuth or owner-verification variables above. With `MONGODB_URI` configured, visitors can load the public site and its portfolio data normally. This is the currently approved production mode. Keep Content Studio access disabled until the values below have been intentionally configured.
 
 The login flow calculates its redirect URI from the current origin. Register the following callback URI with the same OAuth/Manus application that supplies `VITE_APP_ID`:
 
