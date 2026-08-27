@@ -22484,6 +22484,1450 @@ var require_express2 = __commonJS({
   }
 });
 
+// node_modules/.pnpm/delayed-stream@1.0.0/node_modules/delayed-stream/lib/delayed_stream.js
+var require_delayed_stream = __commonJS({
+  "node_modules/.pnpm/delayed-stream@1.0.0/node_modules/delayed-stream/lib/delayed_stream.js"(exports2, module2) {
+    "use strict";
+    var Stream = require("stream").Stream;
+    var util3 = require("util");
+    module2.exports = DelayedStream;
+    function DelayedStream() {
+      this.source = null;
+      this.dataSize = 0;
+      this.maxDataSize = 1024 * 1024;
+      this.pauseStream = true;
+      this._maxDataSizeExceeded = false;
+      this._released = false;
+      this._bufferedEvents = [];
+    }
+    util3.inherits(DelayedStream, Stream);
+    DelayedStream.create = function(source, options) {
+      var delayedStream = new this();
+      options = options || {};
+      for (var option in options) {
+        delayedStream[option] = options[option];
+      }
+      delayedStream.source = source;
+      var realEmit = source.emit;
+      source.emit = function() {
+        delayedStream._handleEmit(arguments);
+        return realEmit.apply(source, arguments);
+      };
+      source.on("error", function() {
+      });
+      if (delayedStream.pauseStream) {
+        source.pause();
+      }
+      return delayedStream;
+    };
+    Object.defineProperty(DelayedStream.prototype, "readable", {
+      configurable: true,
+      enumerable: true,
+      get: function() {
+        return this.source.readable;
+      }
+    });
+    DelayedStream.prototype.setEncoding = function() {
+      return this.source.setEncoding.apply(this.source, arguments);
+    };
+    DelayedStream.prototype.resume = function() {
+      if (!this._released) {
+        this.release();
+      }
+      this.source.resume();
+    };
+    DelayedStream.prototype.pause = function() {
+      this.source.pause();
+    };
+    DelayedStream.prototype.release = function() {
+      this._released = true;
+      this._bufferedEvents.forEach(function(args) {
+        this.emit.apply(this, args);
+      }.bind(this));
+      this._bufferedEvents = [];
+    };
+    DelayedStream.prototype.pipe = function() {
+      var r = Stream.prototype.pipe.apply(this, arguments);
+      this.resume();
+      return r;
+    };
+    DelayedStream.prototype._handleEmit = function(args) {
+      if (this._released) {
+        this.emit.apply(this, args);
+        return;
+      }
+      if (args[0] === "data") {
+        this.dataSize += args[1].length;
+        this._checkIfMaxDataSizeExceeded();
+      }
+      this._bufferedEvents.push(args);
+    };
+    DelayedStream.prototype._checkIfMaxDataSizeExceeded = function() {
+      if (this._maxDataSizeExceeded) {
+        return;
+      }
+      if (this.dataSize <= this.maxDataSize) {
+        return;
+      }
+      this._maxDataSizeExceeded = true;
+      var message2 = "DelayedStream#maxDataSize of " + this.maxDataSize + " bytes exceeded.";
+      this.emit("error", new Error(message2));
+    };
+  }
+});
+
+// node_modules/.pnpm/combined-stream@1.0.8/node_modules/combined-stream/lib/combined_stream.js
+var require_combined_stream = __commonJS({
+  "node_modules/.pnpm/combined-stream@1.0.8/node_modules/combined-stream/lib/combined_stream.js"(exports2, module2) {
+    "use strict";
+    var util3 = require("util");
+    var Stream = require("stream").Stream;
+    var DelayedStream = require_delayed_stream();
+    module2.exports = CombinedStream;
+    function CombinedStream() {
+      this.writable = false;
+      this.readable = true;
+      this.dataSize = 0;
+      this.maxDataSize = 2 * 1024 * 1024;
+      this.pauseStreams = true;
+      this._released = false;
+      this._streams = [];
+      this._currentStream = null;
+      this._insideLoop = false;
+      this._pendingNext = false;
+    }
+    util3.inherits(CombinedStream, Stream);
+    CombinedStream.create = function(options) {
+      var combinedStream = new this();
+      options = options || {};
+      for (var option in options) {
+        combinedStream[option] = options[option];
+      }
+      return combinedStream;
+    };
+    CombinedStream.isStreamLike = function(stream4) {
+      return typeof stream4 !== "function" && typeof stream4 !== "string" && typeof stream4 !== "boolean" && typeof stream4 !== "number" && !Buffer.isBuffer(stream4);
+    };
+    CombinedStream.prototype.append = function(stream4) {
+      var isStreamLike = CombinedStream.isStreamLike(stream4);
+      if (isStreamLike) {
+        if (!(stream4 instanceof DelayedStream)) {
+          var newStream = DelayedStream.create(stream4, {
+            maxDataSize: Infinity,
+            pauseStream: this.pauseStreams
+          });
+          stream4.on("data", this._checkDataSize.bind(this));
+          stream4 = newStream;
+        }
+        this._handleErrors(stream4);
+        if (this.pauseStreams) {
+          stream4.pause();
+        }
+      }
+      this._streams.push(stream4);
+      return this;
+    };
+    CombinedStream.prototype.pipe = function(dest, options) {
+      Stream.prototype.pipe.call(this, dest, options);
+      this.resume();
+      return dest;
+    };
+    CombinedStream.prototype._getNext = function() {
+      this._currentStream = null;
+      if (this._insideLoop) {
+        this._pendingNext = true;
+        return;
+      }
+      this._insideLoop = true;
+      try {
+        do {
+          this._pendingNext = false;
+          this._realGetNext();
+        } while (this._pendingNext);
+      } finally {
+        this._insideLoop = false;
+      }
+    };
+    CombinedStream.prototype._realGetNext = function() {
+      var stream4 = this._streams.shift();
+      if (typeof stream4 == "undefined") {
+        this.end();
+        return;
+      }
+      if (typeof stream4 !== "function") {
+        this._pipeNext(stream4);
+        return;
+      }
+      var getStream = stream4;
+      getStream(function(stream5) {
+        var isStreamLike = CombinedStream.isStreamLike(stream5);
+        if (isStreamLike) {
+          stream5.on("data", this._checkDataSize.bind(this));
+          this._handleErrors(stream5);
+        }
+        this._pipeNext(stream5);
+      }.bind(this));
+    };
+    CombinedStream.prototype._pipeNext = function(stream4) {
+      this._currentStream = stream4;
+      var isStreamLike = CombinedStream.isStreamLike(stream4);
+      if (isStreamLike) {
+        stream4.on("end", this._getNext.bind(this));
+        stream4.pipe(this, { end: false });
+        return;
+      }
+      var value = stream4;
+      this.write(value);
+      this._getNext();
+    };
+    CombinedStream.prototype._handleErrors = function(stream4) {
+      var self2 = this;
+      stream4.on("error", function(err) {
+        self2._emitError(err);
+      });
+    };
+    CombinedStream.prototype.write = function(data) {
+      this.emit("data", data);
+    };
+    CombinedStream.prototype.pause = function() {
+      if (!this.pauseStreams) {
+        return;
+      }
+      if (this.pauseStreams && this._currentStream && typeof this._currentStream.pause == "function") this._currentStream.pause();
+      this.emit("pause");
+    };
+    CombinedStream.prototype.resume = function() {
+      if (!this._released) {
+        this._released = true;
+        this.writable = true;
+        this._getNext();
+      }
+      if (this.pauseStreams && this._currentStream && typeof this._currentStream.resume == "function") this._currentStream.resume();
+      this.emit("resume");
+    };
+    CombinedStream.prototype.end = function() {
+      this._reset();
+      this.emit("end");
+    };
+    CombinedStream.prototype.destroy = function() {
+      this._reset();
+      this.emit("close");
+    };
+    CombinedStream.prototype._reset = function() {
+      this.writable = false;
+      this._streams = [];
+      this._currentStream = null;
+    };
+    CombinedStream.prototype._checkDataSize = function() {
+      this._updateDataSize();
+      if (this.dataSize <= this.maxDataSize) {
+        return;
+      }
+      var message2 = "DelayedStream#maxDataSize of " + this.maxDataSize + " bytes exceeded.";
+      this._emitError(new Error(message2));
+    };
+    CombinedStream.prototype._updateDataSize = function() {
+      this.dataSize = 0;
+      var self2 = this;
+      this._streams.forEach(function(stream4) {
+        if (!stream4.dataSize) {
+          return;
+        }
+        self2.dataSize += stream4.dataSize;
+      });
+      if (this._currentStream && this._currentStream.dataSize) {
+        this.dataSize += this._currentStream.dataSize;
+      }
+    };
+    CombinedStream.prototype._emitError = function(err) {
+      this._reset();
+      this.emit("error", err);
+    };
+  }
+});
+
+// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/defer.js
+var require_defer = __commonJS({
+  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/defer.js"(exports2, module2) {
+    "use strict";
+    module2.exports = defer;
+    function defer(fn) {
+      var nextTick = typeof setImmediate == "function" ? setImmediate : typeof process == "object" && typeof process.nextTick == "function" ? process.nextTick : null;
+      if (nextTick) {
+        nextTick(fn);
+      } else {
+        setTimeout(fn, 0);
+      }
+    }
+  }
+});
+
+// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/async.js
+var require_async = __commonJS({
+  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/async.js"(exports2, module2) {
+    "use strict";
+    var defer = require_defer();
+    module2.exports = async;
+    function async(callback) {
+      var isAsync = false;
+      defer(function() {
+        isAsync = true;
+      });
+      return function async_callback(err, result) {
+        if (isAsync) {
+          callback(err, result);
+        } else {
+          defer(function nextTick_callback() {
+            callback(err, result);
+          });
+        }
+      };
+    }
+  }
+});
+
+// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/abort.js
+var require_abort = __commonJS({
+  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/abort.js"(exports2, module2) {
+    "use strict";
+    module2.exports = abort;
+    function abort(state) {
+      Object.keys(state.jobs).forEach(clean.bind(state));
+      state.jobs = {};
+    }
+    function clean(key) {
+      if (typeof this.jobs[key] == "function") {
+        this.jobs[key]();
+      }
+    }
+  }
+});
+
+// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/iterate.js
+var require_iterate = __commonJS({
+  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/iterate.js"(exports2, module2) {
+    "use strict";
+    var async = require_async();
+    var abort = require_abort();
+    module2.exports = iterate;
+    function iterate(list, iterator2, state, callback) {
+      var key = state["keyedList"] ? state["keyedList"][state.index] : state.index;
+      state.jobs[key] = runJob(iterator2, key, list[key], function(error46, output) {
+        if (!(key in state.jobs)) {
+          return;
+        }
+        delete state.jobs[key];
+        if (error46) {
+          abort(state);
+        } else {
+          state.results[key] = output;
+        }
+        callback(error46, state.results);
+      });
+    }
+    function runJob(iterator2, key, item, callback) {
+      var aborter;
+      if (iterator2.length == 2) {
+        aborter = iterator2(item, async(callback));
+      } else {
+        aborter = iterator2(item, key, async(callback));
+      }
+      return aborter;
+    }
+  }
+});
+
+// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/state.js
+var require_state = __commonJS({
+  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/state.js"(exports2, module2) {
+    "use strict";
+    module2.exports = state;
+    function state(list, sortMethod) {
+      var isNamedList = !Array.isArray(list), initState = {
+        index: 0,
+        keyedList: isNamedList || sortMethod ? Object.keys(list) : null,
+        jobs: {},
+        results: isNamedList ? {} : [],
+        size: isNamedList ? Object.keys(list).length : list.length
+      };
+      if (sortMethod) {
+        initState.keyedList.sort(isNamedList ? sortMethod : function(a, b) {
+          return sortMethod(list[a], list[b]);
+        });
+      }
+      return initState;
+    }
+  }
+});
+
+// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/terminator.js
+var require_terminator = __commonJS({
+  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/terminator.js"(exports2, module2) {
+    "use strict";
+    var abort = require_abort();
+    var async = require_async();
+    module2.exports = terminator;
+    function terminator(callback) {
+      if (!Object.keys(this.jobs).length) {
+        return;
+      }
+      this.index = this.size;
+      abort(this);
+      async(callback)(null, this.results);
+    }
+  }
+});
+
+// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/parallel.js
+var require_parallel = __commonJS({
+  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/parallel.js"(exports2, module2) {
+    "use strict";
+    var iterate = require_iterate();
+    var initState = require_state();
+    var terminator = require_terminator();
+    module2.exports = parallel;
+    function parallel(list, iterator2, callback) {
+      var state = initState(list);
+      while (state.index < (state["keyedList"] || list).length) {
+        iterate(list, iterator2, state, function(error46, result) {
+          if (error46) {
+            callback(error46, result);
+            return;
+          }
+          if (Object.keys(state.jobs).length === 0) {
+            callback(null, state.results);
+            return;
+          }
+        });
+        state.index++;
+      }
+      return terminator.bind(state, callback);
+    }
+  }
+});
+
+// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/serialOrdered.js
+var require_serialOrdered = __commonJS({
+  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/serialOrdered.js"(exports2, module2) {
+    "use strict";
+    var iterate = require_iterate();
+    var initState = require_state();
+    var terminator = require_terminator();
+    module2.exports = serialOrdered;
+    module2.exports.ascending = ascending;
+    module2.exports.descending = descending;
+    function serialOrdered(list, iterator2, sortMethod, callback) {
+      var state = initState(list, sortMethod);
+      iterate(list, iterator2, state, function iteratorHandler(error46, result) {
+        if (error46) {
+          callback(error46, result);
+          return;
+        }
+        state.index++;
+        if (state.index < (state["keyedList"] || list).length) {
+          iterate(list, iterator2, state, iteratorHandler);
+          return;
+        }
+        callback(null, state.results);
+      });
+      return terminator.bind(state, callback);
+    }
+    function ascending(a, b) {
+      return a < b ? -1 : a > b ? 1 : 0;
+    }
+    function descending(a, b) {
+      return -1 * ascending(a, b);
+    }
+  }
+});
+
+// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/serial.js
+var require_serial = __commonJS({
+  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/serial.js"(exports2, module2) {
+    "use strict";
+    var serialOrdered = require_serialOrdered();
+    module2.exports = serial;
+    function serial(list, iterator2, callback) {
+      return serialOrdered(list, iterator2, null, callback);
+    }
+  }
+});
+
+// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/index.js
+var require_asynckit = __commonJS({
+  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/index.js"(exports2, module2) {
+    "use strict";
+    module2.exports = {
+      parallel: require_parallel(),
+      serial: require_serial(),
+      serialOrdered: require_serialOrdered()
+    };
+  }
+});
+
+// node_modules/.pnpm/has-tostringtag@1.0.2/node_modules/has-tostringtag/shams.js
+var require_shams2 = __commonJS({
+  "node_modules/.pnpm/has-tostringtag@1.0.2/node_modules/has-tostringtag/shams.js"(exports2, module2) {
+    "use strict";
+    var hasSymbols = require_shams();
+    module2.exports = function hasToStringTagShams() {
+      return hasSymbols() && !!Symbol.toStringTag;
+    };
+  }
+});
+
+// node_modules/.pnpm/es-set-tostringtag@2.1.0/node_modules/es-set-tostringtag/index.js
+var require_es_set_tostringtag = __commonJS({
+  "node_modules/.pnpm/es-set-tostringtag@2.1.0/node_modules/es-set-tostringtag/index.js"(exports2, module2) {
+    "use strict";
+    var GetIntrinsic = require_get_intrinsic();
+    var $defineProperty = GetIntrinsic("%Object.defineProperty%", true);
+    var hasToStringTag = require_shams2()();
+    var hasOwn = require_hasown();
+    var $TypeError = require_type();
+    var toStringTag2 = hasToStringTag ? Symbol.toStringTag : null;
+    module2.exports = function setToStringTag(object2, value) {
+      var overrideIfSet = arguments.length > 2 && !!arguments[2] && arguments[2].force;
+      var nonConfigurable = arguments.length > 2 && !!arguments[2] && arguments[2].nonConfigurable;
+      if (typeof overrideIfSet !== "undefined" && typeof overrideIfSet !== "boolean" || typeof nonConfigurable !== "undefined" && typeof nonConfigurable !== "boolean") {
+        throw new $TypeError("if provided, the `overrideIfSet` and `nonConfigurable` options must be booleans");
+      }
+      if (toStringTag2 && (overrideIfSet || !hasOwn(object2, toStringTag2))) {
+        if ($defineProperty) {
+          $defineProperty(object2, toStringTag2, {
+            configurable: !nonConfigurable,
+            enumerable: false,
+            value,
+            writable: false
+          });
+        } else {
+          object2[toStringTag2] = value;
+        }
+      }
+    };
+  }
+});
+
+// node_modules/.pnpm/form-data@4.0.4/node_modules/form-data/lib/populate.js
+var require_populate = __commonJS({
+  "node_modules/.pnpm/form-data@4.0.4/node_modules/form-data/lib/populate.js"(exports2, module2) {
+    "use strict";
+    module2.exports = function(dst, src) {
+      Object.keys(src).forEach(function(prop) {
+        dst[prop] = dst[prop] || src[prop];
+      });
+      return dst;
+    };
+  }
+});
+
+// node_modules/.pnpm/form-data@4.0.4/node_modules/form-data/lib/form_data.js
+var require_form_data = __commonJS({
+  "node_modules/.pnpm/form-data@4.0.4/node_modules/form-data/lib/form_data.js"(exports2, module2) {
+    "use strict";
+    var CombinedStream = require_combined_stream();
+    var util3 = require("util");
+    var path = require("path");
+    var http2 = require("http");
+    var https2 = require("https");
+    var parseUrl = require("url").parse;
+    var fs = require("fs");
+    var Stream = require("stream").Stream;
+    var crypto4 = require("crypto");
+    var mime = require_mime_types();
+    var asynckit = require_asynckit();
+    var setToStringTag = require_es_set_tostringtag();
+    var hasOwn = require_hasown();
+    var populate = require_populate();
+    function FormData3(options) {
+      if (!(this instanceof FormData3)) {
+        return new FormData3(options);
+      }
+      this._overheadLength = 0;
+      this._valueLength = 0;
+      this._valuesToMeasure = [];
+      CombinedStream.call(this);
+      options = options || {};
+      for (var option in options) {
+        this[option] = options[option];
+      }
+    }
+    util3.inherits(FormData3, CombinedStream);
+    FormData3.LINE_BREAK = "\r\n";
+    FormData3.DEFAULT_CONTENT_TYPE = "application/octet-stream";
+    FormData3.prototype.append = function(field, value, options) {
+      options = options || {};
+      if (typeof options === "string") {
+        options = { filename: options };
+      }
+      var append2 = CombinedStream.prototype.append.bind(this);
+      if (typeof value === "number" || value == null) {
+        value = String(value);
+      }
+      if (Array.isArray(value)) {
+        this._error(new Error("Arrays are not supported."));
+        return;
+      }
+      var header = this._multiPartHeader(field, value, options);
+      var footer = this._multiPartFooter();
+      append2(header);
+      append2(value);
+      append2(footer);
+      this._trackLength(header, value, options);
+    };
+    FormData3.prototype._trackLength = function(header, value, options) {
+      var valueLength = 0;
+      if (options.knownLength != null) {
+        valueLength += Number(options.knownLength);
+      } else if (Buffer.isBuffer(value)) {
+        valueLength = value.length;
+      } else if (typeof value === "string") {
+        valueLength = Buffer.byteLength(value);
+      }
+      this._valueLength += valueLength;
+      this._overheadLength += Buffer.byteLength(header) + FormData3.LINE_BREAK.length;
+      if (!value || !value.path && !(value.readable && hasOwn(value, "httpVersion")) && !(value instanceof Stream)) {
+        return;
+      }
+      if (!options.knownLength) {
+        this._valuesToMeasure.push(value);
+      }
+    };
+    FormData3.prototype._lengthRetriever = function(value, callback) {
+      if (hasOwn(value, "fd")) {
+        if (value.end != void 0 && value.end != Infinity && value.start != void 0) {
+          callback(null, value.end + 1 - (value.start ? value.start : 0));
+        } else {
+          fs.stat(value.path, function(err, stat) {
+            if (err) {
+              callback(err);
+              return;
+            }
+            var fileSize = stat.size - (value.start ? value.start : 0);
+            callback(null, fileSize);
+          });
+        }
+      } else if (hasOwn(value, "httpVersion")) {
+        callback(null, Number(value.headers["content-length"]));
+      } else if (hasOwn(value, "httpModule")) {
+        value.on("response", function(response) {
+          value.pause();
+          callback(null, Number(response.headers["content-length"]));
+        });
+        value.resume();
+      } else {
+        callback("Unknown stream");
+      }
+    };
+    FormData3.prototype._multiPartHeader = function(field, value, options) {
+      if (typeof options.header === "string") {
+        return options.header;
+      }
+      var contentDisposition = this._getContentDisposition(value, options);
+      var contentType = this._getContentType(value, options);
+      var contents = "";
+      var headers = {
+        // add custom disposition as third element or keep it two elements if not
+        "Content-Disposition": ["form-data", 'name="' + field + '"'].concat(contentDisposition || []),
+        // if no content type. allow it to be empty array
+        "Content-Type": [].concat(contentType || [])
+      };
+      if (typeof options.header === "object") {
+        populate(headers, options.header);
+      }
+      var header;
+      for (var prop in headers) {
+        if (hasOwn(headers, prop)) {
+          header = headers[prop];
+          if (header == null) {
+            continue;
+          }
+          if (!Array.isArray(header)) {
+            header = [header];
+          }
+          if (header.length) {
+            contents += prop + ": " + header.join("; ") + FormData3.LINE_BREAK;
+          }
+        }
+      }
+      return "--" + this.getBoundary() + FormData3.LINE_BREAK + contents + FormData3.LINE_BREAK;
+    };
+    FormData3.prototype._getContentDisposition = function(value, options) {
+      var filename;
+      if (typeof options.filepath === "string") {
+        filename = path.normalize(options.filepath).replace(/\\/g, "/");
+      } else if (options.filename || value && (value.name || value.path)) {
+        filename = path.basename(options.filename || value && (value.name || value.path));
+      } else if (value && value.readable && hasOwn(value, "httpVersion")) {
+        filename = path.basename(value.client._httpMessage.path || "");
+      }
+      if (filename) {
+        return 'filename="' + filename + '"';
+      }
+    };
+    FormData3.prototype._getContentType = function(value, options) {
+      var contentType = options.contentType;
+      if (!contentType && value && value.name) {
+        contentType = mime.lookup(value.name);
+      }
+      if (!contentType && value && value.path) {
+        contentType = mime.lookup(value.path);
+      }
+      if (!contentType && value && value.readable && hasOwn(value, "httpVersion")) {
+        contentType = value.headers["content-type"];
+      }
+      if (!contentType && (options.filepath || options.filename)) {
+        contentType = mime.lookup(options.filepath || options.filename);
+      }
+      if (!contentType && value && typeof value === "object") {
+        contentType = FormData3.DEFAULT_CONTENT_TYPE;
+      }
+      return contentType;
+    };
+    FormData3.prototype._multiPartFooter = function() {
+      return function(next) {
+        var footer = FormData3.LINE_BREAK;
+        var lastPart = this._streams.length === 0;
+        if (lastPart) {
+          footer += this._lastBoundary();
+        }
+        next(footer);
+      }.bind(this);
+    };
+    FormData3.prototype._lastBoundary = function() {
+      return "--" + this.getBoundary() + "--" + FormData3.LINE_BREAK;
+    };
+    FormData3.prototype.getHeaders = function(userHeaders) {
+      var header;
+      var formHeaders = {
+        "content-type": "multipart/form-data; boundary=" + this.getBoundary()
+      };
+      for (header in userHeaders) {
+        if (hasOwn(userHeaders, header)) {
+          formHeaders[header.toLowerCase()] = userHeaders[header];
+        }
+      }
+      return formHeaders;
+    };
+    FormData3.prototype.setBoundary = function(boundary) {
+      if (typeof boundary !== "string") {
+        throw new TypeError("FormData boundary must be a string");
+      }
+      this._boundary = boundary;
+    };
+    FormData3.prototype.getBoundary = function() {
+      if (!this._boundary) {
+        this._generateBoundary();
+      }
+      return this._boundary;
+    };
+    FormData3.prototype.getBuffer = function() {
+      var dataBuffer = new Buffer.alloc(0);
+      var boundary = this.getBoundary();
+      for (var i = 0, len = this._streams.length; i < len; i++) {
+        if (typeof this._streams[i] !== "function") {
+          if (Buffer.isBuffer(this._streams[i])) {
+            dataBuffer = Buffer.concat([dataBuffer, this._streams[i]]);
+          } else {
+            dataBuffer = Buffer.concat([dataBuffer, Buffer.from(this._streams[i])]);
+          }
+          if (typeof this._streams[i] !== "string" || this._streams[i].substring(2, boundary.length + 2) !== boundary) {
+            dataBuffer = Buffer.concat([dataBuffer, Buffer.from(FormData3.LINE_BREAK)]);
+          }
+        }
+      }
+      return Buffer.concat([dataBuffer, Buffer.from(this._lastBoundary())]);
+    };
+    FormData3.prototype._generateBoundary = function() {
+      this._boundary = "--------------------------" + crypto4.randomBytes(12).toString("hex");
+    };
+    FormData3.prototype.getLengthSync = function() {
+      var knownLength = this._overheadLength + this._valueLength;
+      if (this._streams.length) {
+        knownLength += this._lastBoundary().length;
+      }
+      if (!this.hasKnownLength()) {
+        this._error(new Error("Cannot calculate proper length in synchronous way."));
+      }
+      return knownLength;
+    };
+    FormData3.prototype.hasKnownLength = function() {
+      var hasKnownLength = true;
+      if (this._valuesToMeasure.length) {
+        hasKnownLength = false;
+      }
+      return hasKnownLength;
+    };
+    FormData3.prototype.getLength = function(cb) {
+      var knownLength = this._overheadLength + this._valueLength;
+      if (this._streams.length) {
+        knownLength += this._lastBoundary().length;
+      }
+      if (!this._valuesToMeasure.length) {
+        process.nextTick(cb.bind(this, null, knownLength));
+        return;
+      }
+      asynckit.parallel(this._valuesToMeasure, this._lengthRetriever, function(err, values) {
+        if (err) {
+          cb(err);
+          return;
+        }
+        values.forEach(function(length) {
+          knownLength += length;
+        });
+        cb(null, knownLength);
+      });
+    };
+    FormData3.prototype.submit = function(params, cb) {
+      var request;
+      var options;
+      var defaults2 = { method: "post" };
+      if (typeof params === "string") {
+        params = parseUrl(params);
+        options = populate({
+          port: params.port,
+          path: params.pathname,
+          host: params.hostname,
+          protocol: params.protocol
+        }, defaults2);
+      } else {
+        options = populate(params, defaults2);
+        if (!options.port) {
+          options.port = options.protocol === "https:" ? 443 : 80;
+        }
+      }
+      options.headers = this.getHeaders(params.headers);
+      if (options.protocol === "https:") {
+        request = https2.request(options);
+      } else {
+        request = http2.request(options);
+      }
+      this.getLength(function(err, length) {
+        if (err && err !== "Unknown stream") {
+          this._error(err);
+          return;
+        }
+        if (length) {
+          request.setHeader("Content-Length", length);
+        }
+        this.pipe(request);
+        if (cb) {
+          var onResponse;
+          var callback = function(error46, responce) {
+            request.removeListener("error", callback);
+            request.removeListener("response", onResponse);
+            return cb.call(this, error46, responce);
+          };
+          onResponse = callback.bind(this, null);
+          request.on("error", callback);
+          request.on("response", onResponse);
+        }
+      }.bind(this));
+      return request;
+    };
+    FormData3.prototype._error = function(err) {
+      if (!this.error) {
+        this.error = err;
+        this.pause();
+        this.emit("error", err);
+      }
+    };
+    FormData3.prototype.toString = function() {
+      return "[object FormData]";
+    };
+    setToStringTag(FormData3, "FormData");
+    module2.exports = FormData3;
+  }
+});
+
+// node_modules/.pnpm/proxy-from-env@1.1.0/node_modules/proxy-from-env/index.js
+var require_proxy_from_env = __commonJS({
+  "node_modules/.pnpm/proxy-from-env@1.1.0/node_modules/proxy-from-env/index.js"(exports2) {
+    "use strict";
+    var parseUrl = require("url").parse;
+    var DEFAULT_PORTS = {
+      ftp: 21,
+      gopher: 70,
+      http: 80,
+      https: 443,
+      ws: 80,
+      wss: 443
+    };
+    var stringEndsWith = String.prototype.endsWith || function(s) {
+      return s.length <= this.length && this.indexOf(s, this.length - s.length) !== -1;
+    };
+    function getProxyForUrl(url3) {
+      var parsedUrl = typeof url3 === "string" ? parseUrl(url3) : url3 || {};
+      var proto = parsedUrl.protocol;
+      var hostname3 = parsedUrl.host;
+      var port = parsedUrl.port;
+      if (typeof hostname3 !== "string" || !hostname3 || typeof proto !== "string") {
+        return "";
+      }
+      proto = proto.split(":", 1)[0];
+      hostname3 = hostname3.replace(/:\d*$/, "");
+      port = parseInt(port) || DEFAULT_PORTS[proto] || 0;
+      if (!shouldProxy(hostname3, port)) {
+        return "";
+      }
+      var proxy = getEnv("npm_config_" + proto + "_proxy") || getEnv(proto + "_proxy") || getEnv("npm_config_proxy") || getEnv("all_proxy");
+      if (proxy && proxy.indexOf("://") === -1) {
+        proxy = proto + "://" + proxy;
+      }
+      return proxy;
+    }
+    function shouldProxy(hostname3, port) {
+      var NO_PROXY = (getEnv("npm_config_no_proxy") || getEnv("no_proxy")).toLowerCase();
+      if (!NO_PROXY) {
+        return true;
+      }
+      if (NO_PROXY === "*") {
+        return false;
+      }
+      return NO_PROXY.split(/[,\s]/).every(function(proxy) {
+        if (!proxy) {
+          return true;
+        }
+        var parsedProxy = proxy.match(/^(.+):(\d+)$/);
+        var parsedProxyHostname = parsedProxy ? parsedProxy[1] : proxy;
+        var parsedProxyPort = parsedProxy ? parseInt(parsedProxy[2]) : 0;
+        if (parsedProxyPort && parsedProxyPort !== port) {
+          return true;
+        }
+        if (!/^[.*]/.test(parsedProxyHostname)) {
+          return hostname3 !== parsedProxyHostname;
+        }
+        if (parsedProxyHostname.charAt(0) === "*") {
+          parsedProxyHostname = parsedProxyHostname.slice(1);
+        }
+        return !stringEndsWith.call(hostname3, parsedProxyHostname);
+      });
+    }
+    function getEnv(key) {
+      return process.env[key.toLowerCase()] || process.env[key.toUpperCase()] || "";
+    }
+    exports2.getProxyForUrl = getProxyForUrl;
+  }
+});
+
+// node_modules/.pnpm/follow-redirects@1.15.11/node_modules/follow-redirects/debug.js
+var require_debug2 = __commonJS({
+  "node_modules/.pnpm/follow-redirects@1.15.11/node_modules/follow-redirects/debug.js"(exports2, module2) {
+    "use strict";
+    var debug;
+    module2.exports = function() {
+      if (!debug) {
+        try {
+          debug = require_src()("follow-redirects");
+        } catch (error46) {
+        }
+        if (typeof debug !== "function") {
+          debug = function() {
+          };
+        }
+      }
+      debug.apply(null, arguments);
+    };
+  }
+});
+
+// node_modules/.pnpm/follow-redirects@1.15.11/node_modules/follow-redirects/index.js
+var require_follow_redirects = __commonJS({
+  "node_modules/.pnpm/follow-redirects@1.15.11/node_modules/follow-redirects/index.js"(exports2, module2) {
+    "use strict";
+    var url3 = require("url");
+    var URL2 = url3.URL;
+    var http2 = require("http");
+    var https2 = require("https");
+    var Writable = require("stream").Writable;
+    var assert2 = require("assert");
+    var debug = require_debug2();
+    (function detectUnsupportedEnvironment() {
+      var looksLikeNode = typeof process !== "undefined";
+      var looksLikeBrowser = typeof window !== "undefined" && typeof document !== "undefined";
+      var looksLikeV8 = isFunction4(Error.captureStackTrace);
+      if (!looksLikeNode && (looksLikeBrowser || !looksLikeV8)) {
+        console.warn("The follow-redirects package should be excluded from browser builds.");
+      }
+    })();
+    var useNativeURL = false;
+    try {
+      assert2(new URL2(""));
+    } catch (error46) {
+      useNativeURL = error46.code === "ERR_INVALID_URL";
+    }
+    var preservedUrlFields = [
+      "auth",
+      "host",
+      "hostname",
+      "href",
+      "path",
+      "pathname",
+      "port",
+      "protocol",
+      "query",
+      "search",
+      "hash"
+    ];
+    var events = ["abort", "aborted", "connect", "error", "socket", "timeout"];
+    var eventHandlers = /* @__PURE__ */ Object.create(null);
+    events.forEach(function(event) {
+      eventHandlers[event] = function(arg1, arg2, arg3) {
+        this._redirectable.emit(event, arg1, arg2, arg3);
+      };
+    });
+    var InvalidUrlError = createErrorType(
+      "ERR_INVALID_URL",
+      "Invalid URL",
+      TypeError
+    );
+    var RedirectionError = createErrorType(
+      "ERR_FR_REDIRECTION_FAILURE",
+      "Redirected request failed"
+    );
+    var TooManyRedirectsError = createErrorType(
+      "ERR_FR_TOO_MANY_REDIRECTS",
+      "Maximum number of redirects exceeded",
+      RedirectionError
+    );
+    var MaxBodyLengthExceededError = createErrorType(
+      "ERR_FR_MAX_BODY_LENGTH_EXCEEDED",
+      "Request body larger than maxBodyLength limit"
+    );
+    var WriteAfterEndError = createErrorType(
+      "ERR_STREAM_WRITE_AFTER_END",
+      "write after end"
+    );
+    var destroy = Writable.prototype.destroy || noop3;
+    function RedirectableRequest(options, responseCallback) {
+      Writable.call(this);
+      this._sanitizeOptions(options);
+      this._options = options;
+      this._ended = false;
+      this._ending = false;
+      this._redirectCount = 0;
+      this._redirects = [];
+      this._requestBodyLength = 0;
+      this._requestBodyBuffers = [];
+      if (responseCallback) {
+        this.on("response", responseCallback);
+      }
+      var self2 = this;
+      this._onNativeResponse = function(response) {
+        try {
+          self2._processResponse(response);
+        } catch (cause) {
+          self2.emit("error", cause instanceof RedirectionError ? cause : new RedirectionError({ cause }));
+        }
+      };
+      this._performRequest();
+    }
+    RedirectableRequest.prototype = Object.create(Writable.prototype);
+    RedirectableRequest.prototype.abort = function() {
+      destroyRequest(this._currentRequest);
+      this._currentRequest.abort();
+      this.emit("abort");
+    };
+    RedirectableRequest.prototype.destroy = function(error46) {
+      destroyRequest(this._currentRequest, error46);
+      destroy.call(this, error46);
+      return this;
+    };
+    RedirectableRequest.prototype.write = function(data, encoding, callback) {
+      if (this._ending) {
+        throw new WriteAfterEndError();
+      }
+      if (!isString2(data) && !isBuffer2(data)) {
+        throw new TypeError("data should be a string, Buffer or Uint8Array");
+      }
+      if (isFunction4(encoding)) {
+        callback = encoding;
+        encoding = null;
+      }
+      if (data.length === 0) {
+        if (callback) {
+          callback();
+        }
+        return;
+      }
+      if (this._requestBodyLength + data.length <= this._options.maxBodyLength) {
+        this._requestBodyLength += data.length;
+        this._requestBodyBuffers.push({ data, encoding });
+        this._currentRequest.write(data, encoding, callback);
+      } else {
+        this.emit("error", new MaxBodyLengthExceededError());
+        this.abort();
+      }
+    };
+    RedirectableRequest.prototype.end = function(data, encoding, callback) {
+      if (isFunction4(data)) {
+        callback = data;
+        data = encoding = null;
+      } else if (isFunction4(encoding)) {
+        callback = encoding;
+        encoding = null;
+      }
+      if (!data) {
+        this._ended = this._ending = true;
+        this._currentRequest.end(null, null, callback);
+      } else {
+        var self2 = this;
+        var currentRequest = this._currentRequest;
+        this.write(data, encoding, function() {
+          self2._ended = true;
+          currentRequest.end(null, null, callback);
+        });
+        this._ending = true;
+      }
+    };
+    RedirectableRequest.prototype.setHeader = function(name, value) {
+      this._options.headers[name] = value;
+      this._currentRequest.setHeader(name, value);
+    };
+    RedirectableRequest.prototype.removeHeader = function(name) {
+      delete this._options.headers[name];
+      this._currentRequest.removeHeader(name);
+    };
+    RedirectableRequest.prototype.setTimeout = function(msecs, callback) {
+      var self2 = this;
+      function destroyOnTimeout(socket) {
+        socket.setTimeout(msecs);
+        socket.removeListener("timeout", socket.destroy);
+        socket.addListener("timeout", socket.destroy);
+      }
+      function startTimer(socket) {
+        if (self2._timeout) {
+          clearTimeout(self2._timeout);
+        }
+        self2._timeout = setTimeout(function() {
+          self2.emit("timeout");
+          clearTimer();
+        }, msecs);
+        destroyOnTimeout(socket);
+      }
+      function clearTimer() {
+        if (self2._timeout) {
+          clearTimeout(self2._timeout);
+          self2._timeout = null;
+        }
+        self2.removeListener("abort", clearTimer);
+        self2.removeListener("error", clearTimer);
+        self2.removeListener("response", clearTimer);
+        self2.removeListener("close", clearTimer);
+        if (callback) {
+          self2.removeListener("timeout", callback);
+        }
+        if (!self2.socket) {
+          self2._currentRequest.removeListener("socket", startTimer);
+        }
+      }
+      if (callback) {
+        this.on("timeout", callback);
+      }
+      if (this.socket) {
+        startTimer(this.socket);
+      } else {
+        this._currentRequest.once("socket", startTimer);
+      }
+      this.on("socket", destroyOnTimeout);
+      this.on("abort", clearTimer);
+      this.on("error", clearTimer);
+      this.on("response", clearTimer);
+      this.on("close", clearTimer);
+      return this;
+    };
+    [
+      "flushHeaders",
+      "getHeader",
+      "setNoDelay",
+      "setSocketKeepAlive"
+    ].forEach(function(method) {
+      RedirectableRequest.prototype[method] = function(a, b) {
+        return this._currentRequest[method](a, b);
+      };
+    });
+    ["aborted", "connection", "socket"].forEach(function(property) {
+      Object.defineProperty(RedirectableRequest.prototype, property, {
+        get: function() {
+          return this._currentRequest[property];
+        }
+      });
+    });
+    RedirectableRequest.prototype._sanitizeOptions = function(options) {
+      if (!options.headers) {
+        options.headers = {};
+      }
+      if (options.host) {
+        if (!options.hostname) {
+          options.hostname = options.host;
+        }
+        delete options.host;
+      }
+      if (!options.pathname && options.path) {
+        var searchPos = options.path.indexOf("?");
+        if (searchPos < 0) {
+          options.pathname = options.path;
+        } else {
+          options.pathname = options.path.substring(0, searchPos);
+          options.search = options.path.substring(searchPos);
+        }
+      }
+    };
+    RedirectableRequest.prototype._performRequest = function() {
+      var protocol = this._options.protocol;
+      var nativeProtocol = this._options.nativeProtocols[protocol];
+      if (!nativeProtocol) {
+        throw new TypeError("Unsupported protocol " + protocol);
+      }
+      if (this._options.agents) {
+        var scheme = protocol.slice(0, -1);
+        this._options.agent = this._options.agents[scheme];
+      }
+      var request = this._currentRequest = nativeProtocol.request(this._options, this._onNativeResponse);
+      request._redirectable = this;
+      for (var event of events) {
+        request.on(event, eventHandlers[event]);
+      }
+      this._currentUrl = /^\//.test(this._options.path) ? url3.format(this._options) : (
+        // When making a request to a proxy, […]
+        // a client MUST send the target URI in absolute-form […].
+        this._options.path
+      );
+      if (this._isRedirect) {
+        var i = 0;
+        var self2 = this;
+        var buffers = this._requestBodyBuffers;
+        (function writeNext(error46) {
+          if (request === self2._currentRequest) {
+            if (error46) {
+              self2.emit("error", error46);
+            } else if (i < buffers.length) {
+              var buffer = buffers[i++];
+              if (!request.finished) {
+                request.write(buffer.data, buffer.encoding, writeNext);
+              }
+            } else if (self2._ended) {
+              request.end();
+            }
+          }
+        })();
+      }
+    };
+    RedirectableRequest.prototype._processResponse = function(response) {
+      var statusCode = response.statusCode;
+      if (this._options.trackRedirects) {
+        this._redirects.push({
+          url: this._currentUrl,
+          headers: response.headers,
+          statusCode
+        });
+      }
+      var location = response.headers.location;
+      if (!location || this._options.followRedirects === false || statusCode < 300 || statusCode >= 400) {
+        response.responseUrl = this._currentUrl;
+        response.redirects = this._redirects;
+        this.emit("response", response);
+        this._requestBodyBuffers = [];
+        return;
+      }
+      destroyRequest(this._currentRequest);
+      response.destroy();
+      if (++this._redirectCount > this._options.maxRedirects) {
+        throw new TooManyRedirectsError();
+      }
+      var requestHeaders;
+      var beforeRedirect = this._options.beforeRedirect;
+      if (beforeRedirect) {
+        requestHeaders = Object.assign({
+          // The Host header was set by nativeProtocol.request
+          Host: response.req.getHeader("host")
+        }, this._options.headers);
+      }
+      var method = this._options.method;
+      if ((statusCode === 301 || statusCode === 302) && this._options.method === "POST" || // RFC7231§6.4.4: The 303 (See Other) status code indicates that
+      // the server is redirecting the user agent to a different resource […]
+      // A user agent can perform a retrieval request targeting that URI
+      // (a GET or HEAD request if using HTTP) […]
+      statusCode === 303 && !/^(?:GET|HEAD)$/.test(this._options.method)) {
+        this._options.method = "GET";
+        this._requestBodyBuffers = [];
+        removeMatchingHeaders(/^content-/i, this._options.headers);
+      }
+      var currentHostHeader = removeMatchingHeaders(/^host$/i, this._options.headers);
+      var currentUrlParts = parseUrl(this._currentUrl);
+      var currentHost = currentHostHeader || currentUrlParts.host;
+      var currentUrl = /^\w+:/.test(location) ? this._currentUrl : url3.format(Object.assign(currentUrlParts, { host: currentHost }));
+      var redirectUrl = resolveUrl(location, currentUrl);
+      debug("redirecting to", redirectUrl.href);
+      this._isRedirect = true;
+      spreadUrlObject(redirectUrl, this._options);
+      if (redirectUrl.protocol !== currentUrlParts.protocol && redirectUrl.protocol !== "https:" || redirectUrl.host !== currentHost && !isSubdomain(redirectUrl.host, currentHost)) {
+        removeMatchingHeaders(/^(?:(?:proxy-)?authorization|cookie)$/i, this._options.headers);
+      }
+      if (isFunction4(beforeRedirect)) {
+        var responseDetails = {
+          headers: response.headers,
+          statusCode
+        };
+        var requestDetails = {
+          url: currentUrl,
+          method,
+          headers: requestHeaders
+        };
+        beforeRedirect(this._options, responseDetails, requestDetails);
+        this._sanitizeOptions(this._options);
+      }
+      this._performRequest();
+    };
+    function wrap(protocols) {
+      var exports3 = {
+        maxRedirects: 21,
+        maxBodyLength: 10 * 1024 * 1024
+      };
+      var nativeProtocols = {};
+      Object.keys(protocols).forEach(function(scheme) {
+        var protocol = scheme + ":";
+        var nativeProtocol = nativeProtocols[protocol] = protocols[scheme];
+        var wrappedProtocol = exports3[scheme] = Object.create(nativeProtocol);
+        function request(input, options, callback) {
+          if (isURL(input)) {
+            input = spreadUrlObject(input);
+          } else if (isString2(input)) {
+            input = spreadUrlObject(parseUrl(input));
+          } else {
+            callback = options;
+            options = validateUrl(input);
+            input = { protocol };
+          }
+          if (isFunction4(options)) {
+            callback = options;
+            options = null;
+          }
+          options = Object.assign({
+            maxRedirects: exports3.maxRedirects,
+            maxBodyLength: exports3.maxBodyLength
+          }, input, options);
+          options.nativeProtocols = nativeProtocols;
+          if (!isString2(options.host) && !isString2(options.hostname)) {
+            options.hostname = "::1";
+          }
+          assert2.equal(options.protocol, protocol, "protocol mismatch");
+          debug("options", options);
+          return new RedirectableRequest(options, callback);
+        }
+        function get(input, options, callback) {
+          var wrappedRequest = wrappedProtocol.request(input, options, callback);
+          wrappedRequest.end();
+          return wrappedRequest;
+        }
+        Object.defineProperties(wrappedProtocol, {
+          request: { value: request, configurable: true, enumerable: true, writable: true },
+          get: { value: get, configurable: true, enumerable: true, writable: true }
+        });
+      });
+      return exports3;
+    }
+    function noop3() {
+    }
+    function parseUrl(input) {
+      var parsed;
+      if (useNativeURL) {
+        parsed = new URL2(input);
+      } else {
+        parsed = validateUrl(url3.parse(input));
+        if (!isString2(parsed.protocol)) {
+          throw new InvalidUrlError({ input });
+        }
+      }
+      return parsed;
+    }
+    function resolveUrl(relative, base) {
+      return useNativeURL ? new URL2(relative, base) : parseUrl(url3.resolve(base, relative));
+    }
+    function validateUrl(input) {
+      if (/^\[/.test(input.hostname) && !/^\[[:0-9a-f]+\]$/i.test(input.hostname)) {
+        throw new InvalidUrlError({ input: input.href || input });
+      }
+      if (/^\[/.test(input.host) && !/^\[[:0-9a-f]+\](:\d+)?$/i.test(input.host)) {
+        throw new InvalidUrlError({ input: input.href || input });
+      }
+      return input;
+    }
+    function spreadUrlObject(urlObject, target) {
+      var spread3 = target || {};
+      for (var key of preservedUrlFields) {
+        spread3[key] = urlObject[key];
+      }
+      if (spread3.hostname.startsWith("[")) {
+        spread3.hostname = spread3.hostname.slice(1, -1);
+      }
+      if (spread3.port !== "") {
+        spread3.port = Number(spread3.port);
+      }
+      spread3.path = spread3.search ? spread3.pathname + spread3.search : spread3.pathname;
+      return spread3;
+    }
+    function removeMatchingHeaders(regex, headers) {
+      var lastValue;
+      for (var header in headers) {
+        if (regex.test(header)) {
+          lastValue = headers[header];
+          delete headers[header];
+        }
+      }
+      return lastValue === null || typeof lastValue === "undefined" ? void 0 : String(lastValue).trim();
+    }
+    function createErrorType(code, message2, baseClass) {
+      function CustomError(properties) {
+        if (isFunction4(Error.captureStackTrace)) {
+          Error.captureStackTrace(this, this.constructor);
+        }
+        Object.assign(this, properties || {});
+        this.code = code;
+        this.message = this.cause ? message2 + ": " + this.cause.message : message2;
+      }
+      CustomError.prototype = new (baseClass || Error)();
+      Object.defineProperties(CustomError.prototype, {
+        constructor: {
+          value: CustomError,
+          enumerable: false
+        },
+        name: {
+          value: "Error [" + code + "]",
+          enumerable: false
+        }
+      });
+      return CustomError;
+    }
+    function destroyRequest(request, error46) {
+      for (var event of events) {
+        request.removeListener(event, eventHandlers[event]);
+      }
+      request.on("error", noop3);
+      request.destroy(error46);
+    }
+    function isSubdomain(subdomain, domain2) {
+      assert2(isString2(subdomain) && isString2(domain2));
+      var dot = subdomain.length - domain2.length - 1;
+      return dot > 0 && subdomain[dot] === "." && subdomain.endsWith(domain2);
+    }
+    function isString2(value) {
+      return typeof value === "string" || value instanceof String;
+    }
+    function isFunction4(value) {
+      return typeof value === "function";
+    }
+    function isBuffer2(value) {
+      return typeof value === "object" && "length" in value;
+    }
+    function isURL(value) {
+      return URL2 && value instanceof URL2;
+    }
+    module2.exports = wrap({ http: http2, https: https2 });
+    module2.exports.wrap = wrap;
+  }
+});
+
 // node_modules/.pnpm/cookie@1.0.2/node_modules/cookie/dist/index.js
 var require_dist = __commonJS({
   "node_modules/.pnpm/cookie@1.0.2/node_modules/cookie/dist/index.js"(exports2) {
@@ -55200,1450 +56644,6 @@ var require_lib5 = __commonJS({
   }
 });
 
-// node_modules/.pnpm/delayed-stream@1.0.0/node_modules/delayed-stream/lib/delayed_stream.js
-var require_delayed_stream = __commonJS({
-  "node_modules/.pnpm/delayed-stream@1.0.0/node_modules/delayed-stream/lib/delayed_stream.js"(exports2, module2) {
-    "use strict";
-    var Stream = require("stream").Stream;
-    var util3 = require("util");
-    module2.exports = DelayedStream;
-    function DelayedStream() {
-      this.source = null;
-      this.dataSize = 0;
-      this.maxDataSize = 1024 * 1024;
-      this.pauseStream = true;
-      this._maxDataSizeExceeded = false;
-      this._released = false;
-      this._bufferedEvents = [];
-    }
-    util3.inherits(DelayedStream, Stream);
-    DelayedStream.create = function(source, options) {
-      var delayedStream = new this();
-      options = options || {};
-      for (var option in options) {
-        delayedStream[option] = options[option];
-      }
-      delayedStream.source = source;
-      var realEmit = source.emit;
-      source.emit = function() {
-        delayedStream._handleEmit(arguments);
-        return realEmit.apply(source, arguments);
-      };
-      source.on("error", function() {
-      });
-      if (delayedStream.pauseStream) {
-        source.pause();
-      }
-      return delayedStream;
-    };
-    Object.defineProperty(DelayedStream.prototype, "readable", {
-      configurable: true,
-      enumerable: true,
-      get: function() {
-        return this.source.readable;
-      }
-    });
-    DelayedStream.prototype.setEncoding = function() {
-      return this.source.setEncoding.apply(this.source, arguments);
-    };
-    DelayedStream.prototype.resume = function() {
-      if (!this._released) {
-        this.release();
-      }
-      this.source.resume();
-    };
-    DelayedStream.prototype.pause = function() {
-      this.source.pause();
-    };
-    DelayedStream.prototype.release = function() {
-      this._released = true;
-      this._bufferedEvents.forEach(function(args) {
-        this.emit.apply(this, args);
-      }.bind(this));
-      this._bufferedEvents = [];
-    };
-    DelayedStream.prototype.pipe = function() {
-      var r = Stream.prototype.pipe.apply(this, arguments);
-      this.resume();
-      return r;
-    };
-    DelayedStream.prototype._handleEmit = function(args) {
-      if (this._released) {
-        this.emit.apply(this, args);
-        return;
-      }
-      if (args[0] === "data") {
-        this.dataSize += args[1].length;
-        this._checkIfMaxDataSizeExceeded();
-      }
-      this._bufferedEvents.push(args);
-    };
-    DelayedStream.prototype._checkIfMaxDataSizeExceeded = function() {
-      if (this._maxDataSizeExceeded) {
-        return;
-      }
-      if (this.dataSize <= this.maxDataSize) {
-        return;
-      }
-      this._maxDataSizeExceeded = true;
-      var message2 = "DelayedStream#maxDataSize of " + this.maxDataSize + " bytes exceeded.";
-      this.emit("error", new Error(message2));
-    };
-  }
-});
-
-// node_modules/.pnpm/combined-stream@1.0.8/node_modules/combined-stream/lib/combined_stream.js
-var require_combined_stream = __commonJS({
-  "node_modules/.pnpm/combined-stream@1.0.8/node_modules/combined-stream/lib/combined_stream.js"(exports2, module2) {
-    "use strict";
-    var util3 = require("util");
-    var Stream = require("stream").Stream;
-    var DelayedStream = require_delayed_stream();
-    module2.exports = CombinedStream;
-    function CombinedStream() {
-      this.writable = false;
-      this.readable = true;
-      this.dataSize = 0;
-      this.maxDataSize = 2 * 1024 * 1024;
-      this.pauseStreams = true;
-      this._released = false;
-      this._streams = [];
-      this._currentStream = null;
-      this._insideLoop = false;
-      this._pendingNext = false;
-    }
-    util3.inherits(CombinedStream, Stream);
-    CombinedStream.create = function(options) {
-      var combinedStream = new this();
-      options = options || {};
-      for (var option in options) {
-        combinedStream[option] = options[option];
-      }
-      return combinedStream;
-    };
-    CombinedStream.isStreamLike = function(stream4) {
-      return typeof stream4 !== "function" && typeof stream4 !== "string" && typeof stream4 !== "boolean" && typeof stream4 !== "number" && !Buffer.isBuffer(stream4);
-    };
-    CombinedStream.prototype.append = function(stream4) {
-      var isStreamLike = CombinedStream.isStreamLike(stream4);
-      if (isStreamLike) {
-        if (!(stream4 instanceof DelayedStream)) {
-          var newStream = DelayedStream.create(stream4, {
-            maxDataSize: Infinity,
-            pauseStream: this.pauseStreams
-          });
-          stream4.on("data", this._checkDataSize.bind(this));
-          stream4 = newStream;
-        }
-        this._handleErrors(stream4);
-        if (this.pauseStreams) {
-          stream4.pause();
-        }
-      }
-      this._streams.push(stream4);
-      return this;
-    };
-    CombinedStream.prototype.pipe = function(dest, options) {
-      Stream.prototype.pipe.call(this, dest, options);
-      this.resume();
-      return dest;
-    };
-    CombinedStream.prototype._getNext = function() {
-      this._currentStream = null;
-      if (this._insideLoop) {
-        this._pendingNext = true;
-        return;
-      }
-      this._insideLoop = true;
-      try {
-        do {
-          this._pendingNext = false;
-          this._realGetNext();
-        } while (this._pendingNext);
-      } finally {
-        this._insideLoop = false;
-      }
-    };
-    CombinedStream.prototype._realGetNext = function() {
-      var stream4 = this._streams.shift();
-      if (typeof stream4 == "undefined") {
-        this.end();
-        return;
-      }
-      if (typeof stream4 !== "function") {
-        this._pipeNext(stream4);
-        return;
-      }
-      var getStream = stream4;
-      getStream(function(stream5) {
-        var isStreamLike = CombinedStream.isStreamLike(stream5);
-        if (isStreamLike) {
-          stream5.on("data", this._checkDataSize.bind(this));
-          this._handleErrors(stream5);
-        }
-        this._pipeNext(stream5);
-      }.bind(this));
-    };
-    CombinedStream.prototype._pipeNext = function(stream4) {
-      this._currentStream = stream4;
-      var isStreamLike = CombinedStream.isStreamLike(stream4);
-      if (isStreamLike) {
-        stream4.on("end", this._getNext.bind(this));
-        stream4.pipe(this, { end: false });
-        return;
-      }
-      var value = stream4;
-      this.write(value);
-      this._getNext();
-    };
-    CombinedStream.prototype._handleErrors = function(stream4) {
-      var self2 = this;
-      stream4.on("error", function(err) {
-        self2._emitError(err);
-      });
-    };
-    CombinedStream.prototype.write = function(data) {
-      this.emit("data", data);
-    };
-    CombinedStream.prototype.pause = function() {
-      if (!this.pauseStreams) {
-        return;
-      }
-      if (this.pauseStreams && this._currentStream && typeof this._currentStream.pause == "function") this._currentStream.pause();
-      this.emit("pause");
-    };
-    CombinedStream.prototype.resume = function() {
-      if (!this._released) {
-        this._released = true;
-        this.writable = true;
-        this._getNext();
-      }
-      if (this.pauseStreams && this._currentStream && typeof this._currentStream.resume == "function") this._currentStream.resume();
-      this.emit("resume");
-    };
-    CombinedStream.prototype.end = function() {
-      this._reset();
-      this.emit("end");
-    };
-    CombinedStream.prototype.destroy = function() {
-      this._reset();
-      this.emit("close");
-    };
-    CombinedStream.prototype._reset = function() {
-      this.writable = false;
-      this._streams = [];
-      this._currentStream = null;
-    };
-    CombinedStream.prototype._checkDataSize = function() {
-      this._updateDataSize();
-      if (this.dataSize <= this.maxDataSize) {
-        return;
-      }
-      var message2 = "DelayedStream#maxDataSize of " + this.maxDataSize + " bytes exceeded.";
-      this._emitError(new Error(message2));
-    };
-    CombinedStream.prototype._updateDataSize = function() {
-      this.dataSize = 0;
-      var self2 = this;
-      this._streams.forEach(function(stream4) {
-        if (!stream4.dataSize) {
-          return;
-        }
-        self2.dataSize += stream4.dataSize;
-      });
-      if (this._currentStream && this._currentStream.dataSize) {
-        this.dataSize += this._currentStream.dataSize;
-      }
-    };
-    CombinedStream.prototype._emitError = function(err) {
-      this._reset();
-      this.emit("error", err);
-    };
-  }
-});
-
-// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/defer.js
-var require_defer = __commonJS({
-  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/defer.js"(exports2, module2) {
-    "use strict";
-    module2.exports = defer;
-    function defer(fn) {
-      var nextTick = typeof setImmediate == "function" ? setImmediate : typeof process == "object" && typeof process.nextTick == "function" ? process.nextTick : null;
-      if (nextTick) {
-        nextTick(fn);
-      } else {
-        setTimeout(fn, 0);
-      }
-    }
-  }
-});
-
-// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/async.js
-var require_async = __commonJS({
-  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/async.js"(exports2, module2) {
-    "use strict";
-    var defer = require_defer();
-    module2.exports = async;
-    function async(callback) {
-      var isAsync = false;
-      defer(function() {
-        isAsync = true;
-      });
-      return function async_callback(err, result) {
-        if (isAsync) {
-          callback(err, result);
-        } else {
-          defer(function nextTick_callback() {
-            callback(err, result);
-          });
-        }
-      };
-    }
-  }
-});
-
-// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/abort.js
-var require_abort = __commonJS({
-  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/abort.js"(exports2, module2) {
-    "use strict";
-    module2.exports = abort;
-    function abort(state) {
-      Object.keys(state.jobs).forEach(clean.bind(state));
-      state.jobs = {};
-    }
-    function clean(key) {
-      if (typeof this.jobs[key] == "function") {
-        this.jobs[key]();
-      }
-    }
-  }
-});
-
-// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/iterate.js
-var require_iterate = __commonJS({
-  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/iterate.js"(exports2, module2) {
-    "use strict";
-    var async = require_async();
-    var abort = require_abort();
-    module2.exports = iterate;
-    function iterate(list, iterator2, state, callback) {
-      var key = state["keyedList"] ? state["keyedList"][state.index] : state.index;
-      state.jobs[key] = runJob(iterator2, key, list[key], function(error46, output) {
-        if (!(key in state.jobs)) {
-          return;
-        }
-        delete state.jobs[key];
-        if (error46) {
-          abort(state);
-        } else {
-          state.results[key] = output;
-        }
-        callback(error46, state.results);
-      });
-    }
-    function runJob(iterator2, key, item, callback) {
-      var aborter;
-      if (iterator2.length == 2) {
-        aborter = iterator2(item, async(callback));
-      } else {
-        aborter = iterator2(item, key, async(callback));
-      }
-      return aborter;
-    }
-  }
-});
-
-// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/state.js
-var require_state = __commonJS({
-  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/state.js"(exports2, module2) {
-    "use strict";
-    module2.exports = state;
-    function state(list, sortMethod) {
-      var isNamedList = !Array.isArray(list), initState = {
-        index: 0,
-        keyedList: isNamedList || sortMethod ? Object.keys(list) : null,
-        jobs: {},
-        results: isNamedList ? {} : [],
-        size: isNamedList ? Object.keys(list).length : list.length
-      };
-      if (sortMethod) {
-        initState.keyedList.sort(isNamedList ? sortMethod : function(a, b) {
-          return sortMethod(list[a], list[b]);
-        });
-      }
-      return initState;
-    }
-  }
-});
-
-// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/terminator.js
-var require_terminator = __commonJS({
-  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/lib/terminator.js"(exports2, module2) {
-    "use strict";
-    var abort = require_abort();
-    var async = require_async();
-    module2.exports = terminator;
-    function terminator(callback) {
-      if (!Object.keys(this.jobs).length) {
-        return;
-      }
-      this.index = this.size;
-      abort(this);
-      async(callback)(null, this.results);
-    }
-  }
-});
-
-// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/parallel.js
-var require_parallel = __commonJS({
-  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/parallel.js"(exports2, module2) {
-    "use strict";
-    var iterate = require_iterate();
-    var initState = require_state();
-    var terminator = require_terminator();
-    module2.exports = parallel;
-    function parallel(list, iterator2, callback) {
-      var state = initState(list);
-      while (state.index < (state["keyedList"] || list).length) {
-        iterate(list, iterator2, state, function(error46, result) {
-          if (error46) {
-            callback(error46, result);
-            return;
-          }
-          if (Object.keys(state.jobs).length === 0) {
-            callback(null, state.results);
-            return;
-          }
-        });
-        state.index++;
-      }
-      return terminator.bind(state, callback);
-    }
-  }
-});
-
-// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/serialOrdered.js
-var require_serialOrdered = __commonJS({
-  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/serialOrdered.js"(exports2, module2) {
-    "use strict";
-    var iterate = require_iterate();
-    var initState = require_state();
-    var terminator = require_terminator();
-    module2.exports = serialOrdered;
-    module2.exports.ascending = ascending;
-    module2.exports.descending = descending;
-    function serialOrdered(list, iterator2, sortMethod, callback) {
-      var state = initState(list, sortMethod);
-      iterate(list, iterator2, state, function iteratorHandler(error46, result) {
-        if (error46) {
-          callback(error46, result);
-          return;
-        }
-        state.index++;
-        if (state.index < (state["keyedList"] || list).length) {
-          iterate(list, iterator2, state, iteratorHandler);
-          return;
-        }
-        callback(null, state.results);
-      });
-      return terminator.bind(state, callback);
-    }
-    function ascending(a, b) {
-      return a < b ? -1 : a > b ? 1 : 0;
-    }
-    function descending(a, b) {
-      return -1 * ascending(a, b);
-    }
-  }
-});
-
-// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/serial.js
-var require_serial = __commonJS({
-  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/serial.js"(exports2, module2) {
-    "use strict";
-    var serialOrdered = require_serialOrdered();
-    module2.exports = serial;
-    function serial(list, iterator2, callback) {
-      return serialOrdered(list, iterator2, null, callback);
-    }
-  }
-});
-
-// node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/index.js
-var require_asynckit = __commonJS({
-  "node_modules/.pnpm/asynckit@0.4.0/node_modules/asynckit/index.js"(exports2, module2) {
-    "use strict";
-    module2.exports = {
-      parallel: require_parallel(),
-      serial: require_serial(),
-      serialOrdered: require_serialOrdered()
-    };
-  }
-});
-
-// node_modules/.pnpm/has-tostringtag@1.0.2/node_modules/has-tostringtag/shams.js
-var require_shams2 = __commonJS({
-  "node_modules/.pnpm/has-tostringtag@1.0.2/node_modules/has-tostringtag/shams.js"(exports2, module2) {
-    "use strict";
-    var hasSymbols = require_shams();
-    module2.exports = function hasToStringTagShams() {
-      return hasSymbols() && !!Symbol.toStringTag;
-    };
-  }
-});
-
-// node_modules/.pnpm/es-set-tostringtag@2.1.0/node_modules/es-set-tostringtag/index.js
-var require_es_set_tostringtag = __commonJS({
-  "node_modules/.pnpm/es-set-tostringtag@2.1.0/node_modules/es-set-tostringtag/index.js"(exports2, module2) {
-    "use strict";
-    var GetIntrinsic = require_get_intrinsic();
-    var $defineProperty = GetIntrinsic("%Object.defineProperty%", true);
-    var hasToStringTag = require_shams2()();
-    var hasOwn = require_hasown();
-    var $TypeError = require_type();
-    var toStringTag2 = hasToStringTag ? Symbol.toStringTag : null;
-    module2.exports = function setToStringTag(object2, value) {
-      var overrideIfSet = arguments.length > 2 && !!arguments[2] && arguments[2].force;
-      var nonConfigurable = arguments.length > 2 && !!arguments[2] && arguments[2].nonConfigurable;
-      if (typeof overrideIfSet !== "undefined" && typeof overrideIfSet !== "boolean" || typeof nonConfigurable !== "undefined" && typeof nonConfigurable !== "boolean") {
-        throw new $TypeError("if provided, the `overrideIfSet` and `nonConfigurable` options must be booleans");
-      }
-      if (toStringTag2 && (overrideIfSet || !hasOwn(object2, toStringTag2))) {
-        if ($defineProperty) {
-          $defineProperty(object2, toStringTag2, {
-            configurable: !nonConfigurable,
-            enumerable: false,
-            value,
-            writable: false
-          });
-        } else {
-          object2[toStringTag2] = value;
-        }
-      }
-    };
-  }
-});
-
-// node_modules/.pnpm/form-data@4.0.4/node_modules/form-data/lib/populate.js
-var require_populate = __commonJS({
-  "node_modules/.pnpm/form-data@4.0.4/node_modules/form-data/lib/populate.js"(exports2, module2) {
-    "use strict";
-    module2.exports = function(dst, src) {
-      Object.keys(src).forEach(function(prop) {
-        dst[prop] = dst[prop] || src[prop];
-      });
-      return dst;
-    };
-  }
-});
-
-// node_modules/.pnpm/form-data@4.0.4/node_modules/form-data/lib/form_data.js
-var require_form_data = __commonJS({
-  "node_modules/.pnpm/form-data@4.0.4/node_modules/form-data/lib/form_data.js"(exports2, module2) {
-    "use strict";
-    var CombinedStream = require_combined_stream();
-    var util3 = require("util");
-    var path = require("path");
-    var http2 = require("http");
-    var https2 = require("https");
-    var parseUrl = require("url").parse;
-    var fs = require("fs");
-    var Stream = require("stream").Stream;
-    var crypto4 = require("crypto");
-    var mime = require_mime_types();
-    var asynckit = require_asynckit();
-    var setToStringTag = require_es_set_tostringtag();
-    var hasOwn = require_hasown();
-    var populate = require_populate();
-    function FormData3(options) {
-      if (!(this instanceof FormData3)) {
-        return new FormData3(options);
-      }
-      this._overheadLength = 0;
-      this._valueLength = 0;
-      this._valuesToMeasure = [];
-      CombinedStream.call(this);
-      options = options || {};
-      for (var option in options) {
-        this[option] = options[option];
-      }
-    }
-    util3.inherits(FormData3, CombinedStream);
-    FormData3.LINE_BREAK = "\r\n";
-    FormData3.DEFAULT_CONTENT_TYPE = "application/octet-stream";
-    FormData3.prototype.append = function(field, value, options) {
-      options = options || {};
-      if (typeof options === "string") {
-        options = { filename: options };
-      }
-      var append2 = CombinedStream.prototype.append.bind(this);
-      if (typeof value === "number" || value == null) {
-        value = String(value);
-      }
-      if (Array.isArray(value)) {
-        this._error(new Error("Arrays are not supported."));
-        return;
-      }
-      var header = this._multiPartHeader(field, value, options);
-      var footer = this._multiPartFooter();
-      append2(header);
-      append2(value);
-      append2(footer);
-      this._trackLength(header, value, options);
-    };
-    FormData3.prototype._trackLength = function(header, value, options) {
-      var valueLength = 0;
-      if (options.knownLength != null) {
-        valueLength += Number(options.knownLength);
-      } else if (Buffer.isBuffer(value)) {
-        valueLength = value.length;
-      } else if (typeof value === "string") {
-        valueLength = Buffer.byteLength(value);
-      }
-      this._valueLength += valueLength;
-      this._overheadLength += Buffer.byteLength(header) + FormData3.LINE_BREAK.length;
-      if (!value || !value.path && !(value.readable && hasOwn(value, "httpVersion")) && !(value instanceof Stream)) {
-        return;
-      }
-      if (!options.knownLength) {
-        this._valuesToMeasure.push(value);
-      }
-    };
-    FormData3.prototype._lengthRetriever = function(value, callback) {
-      if (hasOwn(value, "fd")) {
-        if (value.end != void 0 && value.end != Infinity && value.start != void 0) {
-          callback(null, value.end + 1 - (value.start ? value.start : 0));
-        } else {
-          fs.stat(value.path, function(err, stat) {
-            if (err) {
-              callback(err);
-              return;
-            }
-            var fileSize = stat.size - (value.start ? value.start : 0);
-            callback(null, fileSize);
-          });
-        }
-      } else if (hasOwn(value, "httpVersion")) {
-        callback(null, Number(value.headers["content-length"]));
-      } else if (hasOwn(value, "httpModule")) {
-        value.on("response", function(response) {
-          value.pause();
-          callback(null, Number(response.headers["content-length"]));
-        });
-        value.resume();
-      } else {
-        callback("Unknown stream");
-      }
-    };
-    FormData3.prototype._multiPartHeader = function(field, value, options) {
-      if (typeof options.header === "string") {
-        return options.header;
-      }
-      var contentDisposition = this._getContentDisposition(value, options);
-      var contentType = this._getContentType(value, options);
-      var contents = "";
-      var headers = {
-        // add custom disposition as third element or keep it two elements if not
-        "Content-Disposition": ["form-data", 'name="' + field + '"'].concat(contentDisposition || []),
-        // if no content type. allow it to be empty array
-        "Content-Type": [].concat(contentType || [])
-      };
-      if (typeof options.header === "object") {
-        populate(headers, options.header);
-      }
-      var header;
-      for (var prop in headers) {
-        if (hasOwn(headers, prop)) {
-          header = headers[prop];
-          if (header == null) {
-            continue;
-          }
-          if (!Array.isArray(header)) {
-            header = [header];
-          }
-          if (header.length) {
-            contents += prop + ": " + header.join("; ") + FormData3.LINE_BREAK;
-          }
-        }
-      }
-      return "--" + this.getBoundary() + FormData3.LINE_BREAK + contents + FormData3.LINE_BREAK;
-    };
-    FormData3.prototype._getContentDisposition = function(value, options) {
-      var filename;
-      if (typeof options.filepath === "string") {
-        filename = path.normalize(options.filepath).replace(/\\/g, "/");
-      } else if (options.filename || value && (value.name || value.path)) {
-        filename = path.basename(options.filename || value && (value.name || value.path));
-      } else if (value && value.readable && hasOwn(value, "httpVersion")) {
-        filename = path.basename(value.client._httpMessage.path || "");
-      }
-      if (filename) {
-        return 'filename="' + filename + '"';
-      }
-    };
-    FormData3.prototype._getContentType = function(value, options) {
-      var contentType = options.contentType;
-      if (!contentType && value && value.name) {
-        contentType = mime.lookup(value.name);
-      }
-      if (!contentType && value && value.path) {
-        contentType = mime.lookup(value.path);
-      }
-      if (!contentType && value && value.readable && hasOwn(value, "httpVersion")) {
-        contentType = value.headers["content-type"];
-      }
-      if (!contentType && (options.filepath || options.filename)) {
-        contentType = mime.lookup(options.filepath || options.filename);
-      }
-      if (!contentType && value && typeof value === "object") {
-        contentType = FormData3.DEFAULT_CONTENT_TYPE;
-      }
-      return contentType;
-    };
-    FormData3.prototype._multiPartFooter = function() {
-      return function(next) {
-        var footer = FormData3.LINE_BREAK;
-        var lastPart = this._streams.length === 0;
-        if (lastPart) {
-          footer += this._lastBoundary();
-        }
-        next(footer);
-      }.bind(this);
-    };
-    FormData3.prototype._lastBoundary = function() {
-      return "--" + this.getBoundary() + "--" + FormData3.LINE_BREAK;
-    };
-    FormData3.prototype.getHeaders = function(userHeaders) {
-      var header;
-      var formHeaders = {
-        "content-type": "multipart/form-data; boundary=" + this.getBoundary()
-      };
-      for (header in userHeaders) {
-        if (hasOwn(userHeaders, header)) {
-          formHeaders[header.toLowerCase()] = userHeaders[header];
-        }
-      }
-      return formHeaders;
-    };
-    FormData3.prototype.setBoundary = function(boundary) {
-      if (typeof boundary !== "string") {
-        throw new TypeError("FormData boundary must be a string");
-      }
-      this._boundary = boundary;
-    };
-    FormData3.prototype.getBoundary = function() {
-      if (!this._boundary) {
-        this._generateBoundary();
-      }
-      return this._boundary;
-    };
-    FormData3.prototype.getBuffer = function() {
-      var dataBuffer = new Buffer.alloc(0);
-      var boundary = this.getBoundary();
-      for (var i = 0, len = this._streams.length; i < len; i++) {
-        if (typeof this._streams[i] !== "function") {
-          if (Buffer.isBuffer(this._streams[i])) {
-            dataBuffer = Buffer.concat([dataBuffer, this._streams[i]]);
-          } else {
-            dataBuffer = Buffer.concat([dataBuffer, Buffer.from(this._streams[i])]);
-          }
-          if (typeof this._streams[i] !== "string" || this._streams[i].substring(2, boundary.length + 2) !== boundary) {
-            dataBuffer = Buffer.concat([dataBuffer, Buffer.from(FormData3.LINE_BREAK)]);
-          }
-        }
-      }
-      return Buffer.concat([dataBuffer, Buffer.from(this._lastBoundary())]);
-    };
-    FormData3.prototype._generateBoundary = function() {
-      this._boundary = "--------------------------" + crypto4.randomBytes(12).toString("hex");
-    };
-    FormData3.prototype.getLengthSync = function() {
-      var knownLength = this._overheadLength + this._valueLength;
-      if (this._streams.length) {
-        knownLength += this._lastBoundary().length;
-      }
-      if (!this.hasKnownLength()) {
-        this._error(new Error("Cannot calculate proper length in synchronous way."));
-      }
-      return knownLength;
-    };
-    FormData3.prototype.hasKnownLength = function() {
-      var hasKnownLength = true;
-      if (this._valuesToMeasure.length) {
-        hasKnownLength = false;
-      }
-      return hasKnownLength;
-    };
-    FormData3.prototype.getLength = function(cb) {
-      var knownLength = this._overheadLength + this._valueLength;
-      if (this._streams.length) {
-        knownLength += this._lastBoundary().length;
-      }
-      if (!this._valuesToMeasure.length) {
-        process.nextTick(cb.bind(this, null, knownLength));
-        return;
-      }
-      asynckit.parallel(this._valuesToMeasure, this._lengthRetriever, function(err, values) {
-        if (err) {
-          cb(err);
-          return;
-        }
-        values.forEach(function(length) {
-          knownLength += length;
-        });
-        cb(null, knownLength);
-      });
-    };
-    FormData3.prototype.submit = function(params, cb) {
-      var request;
-      var options;
-      var defaults2 = { method: "post" };
-      if (typeof params === "string") {
-        params = parseUrl(params);
-        options = populate({
-          port: params.port,
-          path: params.pathname,
-          host: params.hostname,
-          protocol: params.protocol
-        }, defaults2);
-      } else {
-        options = populate(params, defaults2);
-        if (!options.port) {
-          options.port = options.protocol === "https:" ? 443 : 80;
-        }
-      }
-      options.headers = this.getHeaders(params.headers);
-      if (options.protocol === "https:") {
-        request = https2.request(options);
-      } else {
-        request = http2.request(options);
-      }
-      this.getLength(function(err, length) {
-        if (err && err !== "Unknown stream") {
-          this._error(err);
-          return;
-        }
-        if (length) {
-          request.setHeader("Content-Length", length);
-        }
-        this.pipe(request);
-        if (cb) {
-          var onResponse;
-          var callback = function(error46, responce) {
-            request.removeListener("error", callback);
-            request.removeListener("response", onResponse);
-            return cb.call(this, error46, responce);
-          };
-          onResponse = callback.bind(this, null);
-          request.on("error", callback);
-          request.on("response", onResponse);
-        }
-      }.bind(this));
-      return request;
-    };
-    FormData3.prototype._error = function(err) {
-      if (!this.error) {
-        this.error = err;
-        this.pause();
-        this.emit("error", err);
-      }
-    };
-    FormData3.prototype.toString = function() {
-      return "[object FormData]";
-    };
-    setToStringTag(FormData3, "FormData");
-    module2.exports = FormData3;
-  }
-});
-
-// node_modules/.pnpm/proxy-from-env@1.1.0/node_modules/proxy-from-env/index.js
-var require_proxy_from_env = __commonJS({
-  "node_modules/.pnpm/proxy-from-env@1.1.0/node_modules/proxy-from-env/index.js"(exports2) {
-    "use strict";
-    var parseUrl = require("url").parse;
-    var DEFAULT_PORTS = {
-      ftp: 21,
-      gopher: 70,
-      http: 80,
-      https: 443,
-      ws: 80,
-      wss: 443
-    };
-    var stringEndsWith = String.prototype.endsWith || function(s) {
-      return s.length <= this.length && this.indexOf(s, this.length - s.length) !== -1;
-    };
-    function getProxyForUrl(url3) {
-      var parsedUrl = typeof url3 === "string" ? parseUrl(url3) : url3 || {};
-      var proto = parsedUrl.protocol;
-      var hostname3 = parsedUrl.host;
-      var port = parsedUrl.port;
-      if (typeof hostname3 !== "string" || !hostname3 || typeof proto !== "string") {
-        return "";
-      }
-      proto = proto.split(":", 1)[0];
-      hostname3 = hostname3.replace(/:\d*$/, "");
-      port = parseInt(port) || DEFAULT_PORTS[proto] || 0;
-      if (!shouldProxy(hostname3, port)) {
-        return "";
-      }
-      var proxy = getEnv("npm_config_" + proto + "_proxy") || getEnv(proto + "_proxy") || getEnv("npm_config_proxy") || getEnv("all_proxy");
-      if (proxy && proxy.indexOf("://") === -1) {
-        proxy = proto + "://" + proxy;
-      }
-      return proxy;
-    }
-    function shouldProxy(hostname3, port) {
-      var NO_PROXY = (getEnv("npm_config_no_proxy") || getEnv("no_proxy")).toLowerCase();
-      if (!NO_PROXY) {
-        return true;
-      }
-      if (NO_PROXY === "*") {
-        return false;
-      }
-      return NO_PROXY.split(/[,\s]/).every(function(proxy) {
-        if (!proxy) {
-          return true;
-        }
-        var parsedProxy = proxy.match(/^(.+):(\d+)$/);
-        var parsedProxyHostname = parsedProxy ? parsedProxy[1] : proxy;
-        var parsedProxyPort = parsedProxy ? parseInt(parsedProxy[2]) : 0;
-        if (parsedProxyPort && parsedProxyPort !== port) {
-          return true;
-        }
-        if (!/^[.*]/.test(parsedProxyHostname)) {
-          return hostname3 !== parsedProxyHostname;
-        }
-        if (parsedProxyHostname.charAt(0) === "*") {
-          parsedProxyHostname = parsedProxyHostname.slice(1);
-        }
-        return !stringEndsWith.call(hostname3, parsedProxyHostname);
-      });
-    }
-    function getEnv(key) {
-      return process.env[key.toLowerCase()] || process.env[key.toUpperCase()] || "";
-    }
-    exports2.getProxyForUrl = getProxyForUrl;
-  }
-});
-
-// node_modules/.pnpm/follow-redirects@1.15.11/node_modules/follow-redirects/debug.js
-var require_debug2 = __commonJS({
-  "node_modules/.pnpm/follow-redirects@1.15.11/node_modules/follow-redirects/debug.js"(exports2, module2) {
-    "use strict";
-    var debug;
-    module2.exports = function() {
-      if (!debug) {
-        try {
-          debug = require_src()("follow-redirects");
-        } catch (error46) {
-        }
-        if (typeof debug !== "function") {
-          debug = function() {
-          };
-        }
-      }
-      debug.apply(null, arguments);
-    };
-  }
-});
-
-// node_modules/.pnpm/follow-redirects@1.15.11/node_modules/follow-redirects/index.js
-var require_follow_redirects = __commonJS({
-  "node_modules/.pnpm/follow-redirects@1.15.11/node_modules/follow-redirects/index.js"(exports2, module2) {
-    "use strict";
-    var url3 = require("url");
-    var URL2 = url3.URL;
-    var http2 = require("http");
-    var https2 = require("https");
-    var Writable = require("stream").Writable;
-    var assert2 = require("assert");
-    var debug = require_debug2();
-    (function detectUnsupportedEnvironment() {
-      var looksLikeNode = typeof process !== "undefined";
-      var looksLikeBrowser = typeof window !== "undefined" && typeof document !== "undefined";
-      var looksLikeV8 = isFunction4(Error.captureStackTrace);
-      if (!looksLikeNode && (looksLikeBrowser || !looksLikeV8)) {
-        console.warn("The follow-redirects package should be excluded from browser builds.");
-      }
-    })();
-    var useNativeURL = false;
-    try {
-      assert2(new URL2(""));
-    } catch (error46) {
-      useNativeURL = error46.code === "ERR_INVALID_URL";
-    }
-    var preservedUrlFields = [
-      "auth",
-      "host",
-      "hostname",
-      "href",
-      "path",
-      "pathname",
-      "port",
-      "protocol",
-      "query",
-      "search",
-      "hash"
-    ];
-    var events = ["abort", "aborted", "connect", "error", "socket", "timeout"];
-    var eventHandlers = /* @__PURE__ */ Object.create(null);
-    events.forEach(function(event) {
-      eventHandlers[event] = function(arg1, arg2, arg3) {
-        this._redirectable.emit(event, arg1, arg2, arg3);
-      };
-    });
-    var InvalidUrlError = createErrorType(
-      "ERR_INVALID_URL",
-      "Invalid URL",
-      TypeError
-    );
-    var RedirectionError = createErrorType(
-      "ERR_FR_REDIRECTION_FAILURE",
-      "Redirected request failed"
-    );
-    var TooManyRedirectsError = createErrorType(
-      "ERR_FR_TOO_MANY_REDIRECTS",
-      "Maximum number of redirects exceeded",
-      RedirectionError
-    );
-    var MaxBodyLengthExceededError = createErrorType(
-      "ERR_FR_MAX_BODY_LENGTH_EXCEEDED",
-      "Request body larger than maxBodyLength limit"
-    );
-    var WriteAfterEndError = createErrorType(
-      "ERR_STREAM_WRITE_AFTER_END",
-      "write after end"
-    );
-    var destroy = Writable.prototype.destroy || noop3;
-    function RedirectableRequest(options, responseCallback) {
-      Writable.call(this);
-      this._sanitizeOptions(options);
-      this._options = options;
-      this._ended = false;
-      this._ending = false;
-      this._redirectCount = 0;
-      this._redirects = [];
-      this._requestBodyLength = 0;
-      this._requestBodyBuffers = [];
-      if (responseCallback) {
-        this.on("response", responseCallback);
-      }
-      var self2 = this;
-      this._onNativeResponse = function(response) {
-        try {
-          self2._processResponse(response);
-        } catch (cause) {
-          self2.emit("error", cause instanceof RedirectionError ? cause : new RedirectionError({ cause }));
-        }
-      };
-      this._performRequest();
-    }
-    RedirectableRequest.prototype = Object.create(Writable.prototype);
-    RedirectableRequest.prototype.abort = function() {
-      destroyRequest(this._currentRequest);
-      this._currentRequest.abort();
-      this.emit("abort");
-    };
-    RedirectableRequest.prototype.destroy = function(error46) {
-      destroyRequest(this._currentRequest, error46);
-      destroy.call(this, error46);
-      return this;
-    };
-    RedirectableRequest.prototype.write = function(data, encoding, callback) {
-      if (this._ending) {
-        throw new WriteAfterEndError();
-      }
-      if (!isString2(data) && !isBuffer2(data)) {
-        throw new TypeError("data should be a string, Buffer or Uint8Array");
-      }
-      if (isFunction4(encoding)) {
-        callback = encoding;
-        encoding = null;
-      }
-      if (data.length === 0) {
-        if (callback) {
-          callback();
-        }
-        return;
-      }
-      if (this._requestBodyLength + data.length <= this._options.maxBodyLength) {
-        this._requestBodyLength += data.length;
-        this._requestBodyBuffers.push({ data, encoding });
-        this._currentRequest.write(data, encoding, callback);
-      } else {
-        this.emit("error", new MaxBodyLengthExceededError());
-        this.abort();
-      }
-    };
-    RedirectableRequest.prototype.end = function(data, encoding, callback) {
-      if (isFunction4(data)) {
-        callback = data;
-        data = encoding = null;
-      } else if (isFunction4(encoding)) {
-        callback = encoding;
-        encoding = null;
-      }
-      if (!data) {
-        this._ended = this._ending = true;
-        this._currentRequest.end(null, null, callback);
-      } else {
-        var self2 = this;
-        var currentRequest = this._currentRequest;
-        this.write(data, encoding, function() {
-          self2._ended = true;
-          currentRequest.end(null, null, callback);
-        });
-        this._ending = true;
-      }
-    };
-    RedirectableRequest.prototype.setHeader = function(name, value) {
-      this._options.headers[name] = value;
-      this._currentRequest.setHeader(name, value);
-    };
-    RedirectableRequest.prototype.removeHeader = function(name) {
-      delete this._options.headers[name];
-      this._currentRequest.removeHeader(name);
-    };
-    RedirectableRequest.prototype.setTimeout = function(msecs, callback) {
-      var self2 = this;
-      function destroyOnTimeout(socket) {
-        socket.setTimeout(msecs);
-        socket.removeListener("timeout", socket.destroy);
-        socket.addListener("timeout", socket.destroy);
-      }
-      function startTimer(socket) {
-        if (self2._timeout) {
-          clearTimeout(self2._timeout);
-        }
-        self2._timeout = setTimeout(function() {
-          self2.emit("timeout");
-          clearTimer();
-        }, msecs);
-        destroyOnTimeout(socket);
-      }
-      function clearTimer() {
-        if (self2._timeout) {
-          clearTimeout(self2._timeout);
-          self2._timeout = null;
-        }
-        self2.removeListener("abort", clearTimer);
-        self2.removeListener("error", clearTimer);
-        self2.removeListener("response", clearTimer);
-        self2.removeListener("close", clearTimer);
-        if (callback) {
-          self2.removeListener("timeout", callback);
-        }
-        if (!self2.socket) {
-          self2._currentRequest.removeListener("socket", startTimer);
-        }
-      }
-      if (callback) {
-        this.on("timeout", callback);
-      }
-      if (this.socket) {
-        startTimer(this.socket);
-      } else {
-        this._currentRequest.once("socket", startTimer);
-      }
-      this.on("socket", destroyOnTimeout);
-      this.on("abort", clearTimer);
-      this.on("error", clearTimer);
-      this.on("response", clearTimer);
-      this.on("close", clearTimer);
-      return this;
-    };
-    [
-      "flushHeaders",
-      "getHeader",
-      "setNoDelay",
-      "setSocketKeepAlive"
-    ].forEach(function(method) {
-      RedirectableRequest.prototype[method] = function(a, b) {
-        return this._currentRequest[method](a, b);
-      };
-    });
-    ["aborted", "connection", "socket"].forEach(function(property) {
-      Object.defineProperty(RedirectableRequest.prototype, property, {
-        get: function() {
-          return this._currentRequest[property];
-        }
-      });
-    });
-    RedirectableRequest.prototype._sanitizeOptions = function(options) {
-      if (!options.headers) {
-        options.headers = {};
-      }
-      if (options.host) {
-        if (!options.hostname) {
-          options.hostname = options.host;
-        }
-        delete options.host;
-      }
-      if (!options.pathname && options.path) {
-        var searchPos = options.path.indexOf("?");
-        if (searchPos < 0) {
-          options.pathname = options.path;
-        } else {
-          options.pathname = options.path.substring(0, searchPos);
-          options.search = options.path.substring(searchPos);
-        }
-      }
-    };
-    RedirectableRequest.prototype._performRequest = function() {
-      var protocol = this._options.protocol;
-      var nativeProtocol = this._options.nativeProtocols[protocol];
-      if (!nativeProtocol) {
-        throw new TypeError("Unsupported protocol " + protocol);
-      }
-      if (this._options.agents) {
-        var scheme = protocol.slice(0, -1);
-        this._options.agent = this._options.agents[scheme];
-      }
-      var request = this._currentRequest = nativeProtocol.request(this._options, this._onNativeResponse);
-      request._redirectable = this;
-      for (var event of events) {
-        request.on(event, eventHandlers[event]);
-      }
-      this._currentUrl = /^\//.test(this._options.path) ? url3.format(this._options) : (
-        // When making a request to a proxy, […]
-        // a client MUST send the target URI in absolute-form […].
-        this._options.path
-      );
-      if (this._isRedirect) {
-        var i = 0;
-        var self2 = this;
-        var buffers = this._requestBodyBuffers;
-        (function writeNext(error46) {
-          if (request === self2._currentRequest) {
-            if (error46) {
-              self2.emit("error", error46);
-            } else if (i < buffers.length) {
-              var buffer = buffers[i++];
-              if (!request.finished) {
-                request.write(buffer.data, buffer.encoding, writeNext);
-              }
-            } else if (self2._ended) {
-              request.end();
-            }
-          }
-        })();
-      }
-    };
-    RedirectableRequest.prototype._processResponse = function(response) {
-      var statusCode = response.statusCode;
-      if (this._options.trackRedirects) {
-        this._redirects.push({
-          url: this._currentUrl,
-          headers: response.headers,
-          statusCode
-        });
-      }
-      var location = response.headers.location;
-      if (!location || this._options.followRedirects === false || statusCode < 300 || statusCode >= 400) {
-        response.responseUrl = this._currentUrl;
-        response.redirects = this._redirects;
-        this.emit("response", response);
-        this._requestBodyBuffers = [];
-        return;
-      }
-      destroyRequest(this._currentRequest);
-      response.destroy();
-      if (++this._redirectCount > this._options.maxRedirects) {
-        throw new TooManyRedirectsError();
-      }
-      var requestHeaders;
-      var beforeRedirect = this._options.beforeRedirect;
-      if (beforeRedirect) {
-        requestHeaders = Object.assign({
-          // The Host header was set by nativeProtocol.request
-          Host: response.req.getHeader("host")
-        }, this._options.headers);
-      }
-      var method = this._options.method;
-      if ((statusCode === 301 || statusCode === 302) && this._options.method === "POST" || // RFC7231§6.4.4: The 303 (See Other) status code indicates that
-      // the server is redirecting the user agent to a different resource […]
-      // A user agent can perform a retrieval request targeting that URI
-      // (a GET or HEAD request if using HTTP) […]
-      statusCode === 303 && !/^(?:GET|HEAD)$/.test(this._options.method)) {
-        this._options.method = "GET";
-        this._requestBodyBuffers = [];
-        removeMatchingHeaders(/^content-/i, this._options.headers);
-      }
-      var currentHostHeader = removeMatchingHeaders(/^host$/i, this._options.headers);
-      var currentUrlParts = parseUrl(this._currentUrl);
-      var currentHost = currentHostHeader || currentUrlParts.host;
-      var currentUrl = /^\w+:/.test(location) ? this._currentUrl : url3.format(Object.assign(currentUrlParts, { host: currentHost }));
-      var redirectUrl = resolveUrl(location, currentUrl);
-      debug("redirecting to", redirectUrl.href);
-      this._isRedirect = true;
-      spreadUrlObject(redirectUrl, this._options);
-      if (redirectUrl.protocol !== currentUrlParts.protocol && redirectUrl.protocol !== "https:" || redirectUrl.host !== currentHost && !isSubdomain(redirectUrl.host, currentHost)) {
-        removeMatchingHeaders(/^(?:(?:proxy-)?authorization|cookie)$/i, this._options.headers);
-      }
-      if (isFunction4(beforeRedirect)) {
-        var responseDetails = {
-          headers: response.headers,
-          statusCode
-        };
-        var requestDetails = {
-          url: currentUrl,
-          method,
-          headers: requestHeaders
-        };
-        beforeRedirect(this._options, responseDetails, requestDetails);
-        this._sanitizeOptions(this._options);
-      }
-      this._performRequest();
-    };
-    function wrap(protocols) {
-      var exports3 = {
-        maxRedirects: 21,
-        maxBodyLength: 10 * 1024 * 1024
-      };
-      var nativeProtocols = {};
-      Object.keys(protocols).forEach(function(scheme) {
-        var protocol = scheme + ":";
-        var nativeProtocol = nativeProtocols[protocol] = protocols[scheme];
-        var wrappedProtocol = exports3[scheme] = Object.create(nativeProtocol);
-        function request(input, options, callback) {
-          if (isURL(input)) {
-            input = spreadUrlObject(input);
-          } else if (isString2(input)) {
-            input = spreadUrlObject(parseUrl(input));
-          } else {
-            callback = options;
-            options = validateUrl(input);
-            input = { protocol };
-          }
-          if (isFunction4(options)) {
-            callback = options;
-            options = null;
-          }
-          options = Object.assign({
-            maxRedirects: exports3.maxRedirects,
-            maxBodyLength: exports3.maxBodyLength
-          }, input, options);
-          options.nativeProtocols = nativeProtocols;
-          if (!isString2(options.host) && !isString2(options.hostname)) {
-            options.hostname = "::1";
-          }
-          assert2.equal(options.protocol, protocol, "protocol mismatch");
-          debug("options", options);
-          return new RedirectableRequest(options, callback);
-        }
-        function get(input, options, callback) {
-          var wrappedRequest = wrappedProtocol.request(input, options, callback);
-          wrappedRequest.end();
-          return wrappedRequest;
-        }
-        Object.defineProperties(wrappedProtocol, {
-          request: { value: request, configurable: true, enumerable: true, writable: true },
-          get: { value: get, configurable: true, enumerable: true, writable: true }
-        });
-      });
-      return exports3;
-    }
-    function noop3() {
-    }
-    function parseUrl(input) {
-      var parsed;
-      if (useNativeURL) {
-        parsed = new URL2(input);
-      } else {
-        parsed = validateUrl(url3.parse(input));
-        if (!isString2(parsed.protocol)) {
-          throw new InvalidUrlError({ input });
-        }
-      }
-      return parsed;
-    }
-    function resolveUrl(relative, base) {
-      return useNativeURL ? new URL2(relative, base) : parseUrl(url3.resolve(base, relative));
-    }
-    function validateUrl(input) {
-      if (/^\[/.test(input.hostname) && !/^\[[:0-9a-f]+\]$/i.test(input.hostname)) {
-        throw new InvalidUrlError({ input: input.href || input });
-      }
-      if (/^\[/.test(input.host) && !/^\[[:0-9a-f]+\](:\d+)?$/i.test(input.host)) {
-        throw new InvalidUrlError({ input: input.href || input });
-      }
-      return input;
-    }
-    function spreadUrlObject(urlObject, target) {
-      var spread3 = target || {};
-      for (var key of preservedUrlFields) {
-        spread3[key] = urlObject[key];
-      }
-      if (spread3.hostname.startsWith("[")) {
-        spread3.hostname = spread3.hostname.slice(1, -1);
-      }
-      if (spread3.port !== "") {
-        spread3.port = Number(spread3.port);
-      }
-      spread3.path = spread3.search ? spread3.pathname + spread3.search : spread3.pathname;
-      return spread3;
-    }
-    function removeMatchingHeaders(regex, headers) {
-      var lastValue;
-      for (var header in headers) {
-        if (regex.test(header)) {
-          lastValue = headers[header];
-          delete headers[header];
-        }
-      }
-      return lastValue === null || typeof lastValue === "undefined" ? void 0 : String(lastValue).trim();
-    }
-    function createErrorType(code, message2, baseClass) {
-      function CustomError(properties) {
-        if (isFunction4(Error.captureStackTrace)) {
-          Error.captureStackTrace(this, this.constructor);
-        }
-        Object.assign(this, properties || {});
-        this.code = code;
-        this.message = this.cause ? message2 + ": " + this.cause.message : message2;
-      }
-      CustomError.prototype = new (baseClass || Error)();
-      Object.defineProperties(CustomError.prototype, {
-        constructor: {
-          value: CustomError,
-          enumerable: false
-        },
-        name: {
-          value: "Error [" + code + "]",
-          enumerable: false
-        }
-      });
-      return CustomError;
-    }
-    function destroyRequest(request, error46) {
-      for (var event of events) {
-        request.removeListener(event, eventHandlers[event]);
-      }
-      request.on("error", noop3);
-      request.destroy(error46);
-    }
-    function isSubdomain(subdomain, domain2) {
-      assert2(isString2(subdomain) && isString2(domain2));
-      var dot = subdomain.length - domain2.length - 1;
-      return dot > 0 && subdomain[dot] === "." && subdomain.endsWith(domain2);
-    }
-    function isString2(value) {
-      return typeof value === "string" || value instanceof String;
-    }
-    function isFunction4(value) {
-      return typeof value === "function";
-    }
-    function isBuffer2(value) {
-      return typeof value === "object" && "length" in value;
-    }
-    function isURL(value) {
-      return URL2 && value instanceof URL2;
-    }
-    module2.exports = wrap({ http: http2, https: https2 });
-    module2.exports.wrap = wrap;
-  }
-});
-
 // node_modules/.pnpm/superjson@1.13.3/node_modules/superjson/dist/double-indexed-kv.js
 var require_double_indexed_kv = __commonJS({
   "node_modules/.pnpm/superjson@1.13.3/node_modules/superjson/dist/double-indexed-kv.js"(exports2) {
@@ -60728,6 +60728,7 @@ var AXIOS_TIMEOUT_MS = 3e4;
 var UNAUTHED_ERR_MSG = "Please login (10001)";
 var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
 var OAUTH_STATE_COOKIE = "__Host-oauth_state";
+var encodeOAuthState = (state) => btoa(JSON.stringify(state));
 var decodeOAuthState = (state) => {
   let decoded;
   try {
@@ -60742,331 +60743,6 @@ var decodeOAuthState = (state) => {
   }
   return { redirectUri: decoded };
 };
-
-// server/_core/oauth.ts
-var import_cookie2 = __toESM(require_dist(), 1);
-
-// server/db.ts
-var import_mongodb = __toESM(require_lib5(), 1);
-
-// server/_core/env.ts
-var ENV = {
-  appId: process.env.VITE_APP_ID ?? "",
-  cookieSecret: process.env.JWT_SECRET ?? "",
-  mongodbUri: process.env.MONGODB_URI ?? "",
-  oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
-  ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
-  isProduction: process.env.NODE_ENV === "production",
-  forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
-  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? ""
-};
-
-// server/db.ts
-var mongoCache = globalThis.__saniPortfolioMongoCache ?? (globalThis.__saniPortfolioMongoCache = {});
-var indexPromise;
-var testStore = {
-  counters: /* @__PURE__ */ new Map(),
-  users: /* @__PURE__ */ new Map(),
-  settings: /* @__PURE__ */ new Map(),
-  media: /* @__PURE__ */ new Map(),
-  caseStudies: /* @__PURE__ */ new Map(),
-  verificationSessions: /* @__PURE__ */ new Map()
-};
-function isTestRuntime() {
-  return process.env.VITEST === "true" || process.env.NODE_ENV === "test";
-}
-function databaseName(uri) {
-  const configured = process.env.MONGODB_DB?.trim();
-  if (configured) return configured;
-  try {
-    const name = new URL(uri).pathname.replace(/^\//, "").split("/")[0];
-    return name || "sani_portfolio";
-  } catch {
-    return "sani_portfolio";
-  }
-}
-async function getDb() {
-  if (isTestRuntime()) return null;
-  const uri = ENV.mongodbUri;
-  if (!uri) return null;
-  try {
-    if (!mongoCache.client) {
-      mongoCache.promise ??= new import_mongodb.MongoClient(uri, {
-        appName: "sani-virani-portfolio",
-        maxPoolSize: 5,
-        minPoolSize: 0,
-        serverSelectionTimeoutMS: 5e3
-      }).connect();
-      mongoCache.client = await mongoCache.promise;
-    }
-    return mongoCache.client.db(databaseName(uri));
-  } catch (error46) {
-    mongoCache.client = void 0;
-    mongoCache.promise = void 0;
-    console.warn("[MongoDB] Failed to connect:", error46);
-    return null;
-  }
-}
-async function readyDb() {
-  const db = await getDb();
-  if (!db) return null;
-  indexPromise ??= Promise.all([
-    db.collection("users").createIndex({ openId: 1 }, { unique: true }),
-    db.collection("portfolioSettings").createIndex({ key: 1 }, { unique: true }),
-    db.collection("portfolioMedia").createIndex({ id: 1 }, { unique: true }),
-    db.collection("portfolioMedia").createIndex({ key: 1 }, { unique: true }),
-    db.collection("caseStudies").createIndex({ id: 1 }, { unique: true }),
-    db.collection("caseStudies").createIndex({ slug: 1 }, { unique: true }),
-    db.collection("ownerVerificationSessions").createIndex({ userId: 1 }, { unique: true })
-  ]).then(() => void 0).catch((error46) => {
-    indexPromise = void 0;
-    throw error46;
-  });
-  await indexPromise;
-  return db;
-}
-async function nextMongoId(db, key) {
-  const result = await db.collection("portfolioCounters").findOneAndUpdate(
-    { key },
-    { $inc: { value: 1 } },
-    { upsert: true, returnDocument: "after" }
-  );
-  if (!result) throw new Error("Unable to allocate a MongoDB document identifier.");
-  return result.value;
-}
-function nextTestId(key) {
-  const next = (testStore.counters.get(key) ?? 0) + 1;
-  testStore.counters.set(key, next);
-  return next;
-}
-function sortCaseStudies(items) {
-  return items.sort((left, right) => left.sortOrder - right.sortOrder || left.id - right.id);
-}
-function parseJson(value, fallback) {
-  if (typeof value !== "string") return fallback;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return fallback;
-  }
-}
-function isDuplicateEntry(error46) {
-  return error46 instanceof import_mongodb.MongoServerError && error46.code === 11e3 || typeof error46 === "object" && error46 !== null && "code" in error46 && error46.code === 11e3;
-}
-async function upsertUser(user) {
-  if (!user.openId) throw new Error("User openId is required for upsert");
-  const now = /* @__PURE__ */ new Date();
-  const updates = {
-    lastSignedIn: user.lastSignedIn ?? now,
-    updatedAt: now
-  };
-  if (user.name !== void 0) updates.name = user.name ?? null;
-  if (user.email !== void 0) updates.email = user.email ?? null;
-  if (user.loginMethod !== void 0) updates.loginMethod = user.loginMethod ?? null;
-  if (user.role) updates.role = user.role;
-  if (isTestRuntime()) {
-    const existing = testStore.users.get(user.openId);
-    testStore.users.set(user.openId, {
-      id: existing?.id ?? nextTestId("users"),
-      openId: user.openId,
-      name: existing?.name ?? null,
-      email: existing?.email ?? null,
-      loginMethod: existing?.loginMethod ?? null,
-      role: existing?.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "user"),
-      createdAt: existing?.createdAt ?? now,
-      lastSignedIn: user.lastSignedIn ?? now,
-      updatedAt: now,
-      ...updates
-    });
-    return;
-  }
-  const db = await readyDb();
-  if (!db) return;
-  const id = await nextMongoId(db, "users");
-  await db.collection("users").updateOne(
-    { openId: user.openId },
-    {
-      $set: updates,
-      $setOnInsert: {
-        id,
-        openId: user.openId,
-        name: null,
-        email: null,
-        loginMethod: null,
-        role: user.openId === ENV.ownerOpenId ? "admin" : "user",
-        createdAt: now
-      }
-    },
-    { upsert: true }
-  );
-}
-async function getUserByOpenId(openId) {
-  if (isTestRuntime()) return testStore.users.get(openId);
-  const db = await readyDb();
-  if (!db) return void 0;
-  return await db.collection("users").findOne({ openId }, { projection: { _id: 0 } }) ?? void 0;
-}
-async function getSetting(key, fallback) {
-  if (isTestRuntime()) return testStore.settings.get(key)?.value ?? fallback;
-  const db = await readyDb();
-  if (!db) return fallback;
-  const setting = await db.collection("portfolioSettings").findOne({ key }, { projection: { _id: 0 } });
-  return setting?.value ?? fallback;
-}
-async function getAllSettings() {
-  if (isTestRuntime()) return Array.from(testStore.settings.values());
-  const db = await readyDb();
-  return db ? db.collection("portfolioSettings").find({}, { projection: { _id: 0 } }).toArray() : [];
-}
-async function setSetting(key, value) {
-  const now = /* @__PURE__ */ new Date();
-  if (isTestRuntime()) {
-    testStore.settings.set(key, { key, value, updatedAt: now });
-    return;
-  }
-  const db = await readyDb();
-  if (!db) throw new Error("MongoDB is not available.");
-  await db.collection("portfolioSettings").updateOne({ key }, { $set: { value, updatedAt: now }, $setOnInsert: { key } }, { upsert: true });
-}
-async function getCaseStudies(status) {
-  if (isTestRuntime()) return sortCaseStudies(Array.from(testStore.caseStudies.values()).filter((item) => !status || item.status === status));
-  const db = await readyDb();
-  if (!db) return [];
-  return db.collection("caseStudies").find(status ? { status } : {}, { projection: { _id: 0 } }).sort({ sortOrder: 1, id: 1 }).toArray();
-}
-async function createCaseStudy(values) {
-  const now = /* @__PURE__ */ new Date();
-  if (isTestRuntime()) {
-    if (Array.from(testStore.caseStudies.values()).some((item) => item.slug === values.slug)) throw { code: 11e3 };
-    const id2 = nextTestId("caseStudies");
-    testStore.caseStudies.set(id2, { id: id2, ...values, createdAt: now, updatedAt: now });
-    return id2;
-  }
-  const db = await readyDb();
-  if (!db) throw new Error("MongoDB is not available.");
-  const id = await nextMongoId(db, "caseStudies");
-  await db.collection("caseStudies").insertOne({ id, ...values, createdAt: now, updatedAt: now });
-  return id;
-}
-async function updateCaseStudy(id, values) {
-  const now = /* @__PURE__ */ new Date();
-  if (isTestRuntime()) {
-    const existing = testStore.caseStudies.get(id);
-    if (!existing) return false;
-    if (Array.from(testStore.caseStudies.values()).some((item) => item.id !== id && item.slug === values.slug)) throw { code: 11e3 };
-    testStore.caseStudies.set(id, { ...existing, ...values, updatedAt: now });
-    return true;
-  }
-  const db = await readyDb();
-  if (!db) throw new Error("MongoDB is not available.");
-  return (await db.collection("caseStudies").updateOne({ id }, { $set: { ...values, updatedAt: now } })).matchedCount > 0;
-}
-async function removeCaseStudy(id) {
-  if (isTestRuntime()) {
-    testStore.caseStudies.delete(id);
-    return;
-  }
-  const db = await readyDb();
-  if (!db) throw new Error("MongoDB is not available.");
-  await db.collection("caseStudies").deleteOne({ id });
-}
-async function getMedia() {
-  if (isTestRuntime()) return Array.from(testStore.media.values()).sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
-  const db = await readyDb();
-  return db ? db.collection("portfolioMedia").find({}, { projection: { _id: 0 } }).sort({ createdAt: 1 }).toArray() : [];
-}
-async function createMedia(values) {
-  const now = /* @__PURE__ */ new Date();
-  if (isTestRuntime()) {
-    if (Array.from(testStore.media.values()).some((item) => item.key === values.key)) throw { code: 11e3 };
-    const id2 = nextTestId("portfolioMedia");
-    testStore.media.set(id2, { id: id2, ...values, createdAt: now, updatedAt: now });
-    return id2;
-  }
-  const db = await readyDb();
-  if (!db) throw new Error("MongoDB is not available.");
-  const id = await nextMongoId(db, "portfolioMedia");
-  await db.collection("portfolioMedia").insertOne({ id, ...values, createdAt: now, updatedAt: now });
-  return id;
-}
-async function updateMedia(id, values) {
-  const now = /* @__PURE__ */ new Date();
-  if (isTestRuntime()) {
-    const existing = testStore.media.get(id);
-    if (existing) testStore.media.set(id, { ...existing, ...values, updatedAt: now });
-    return;
-  }
-  const db = await readyDb();
-  if (!db) throw new Error("MongoDB is not available.");
-  await db.collection("portfolioMedia").updateOne({ id }, { $set: { ...values, updatedAt: now } });
-}
-async function removeMedia(id) {
-  if (isTestRuntime()) {
-    testStore.media.delete(id);
-    return;
-  }
-  const db = await readyDb();
-  if (!db) throw new Error("MongoDB is not available.");
-  await db.collection("portfolioMedia").deleteOne({ id });
-}
-async function getOwnerVerificationSession(userId) {
-  if (isTestRuntime()) return testStore.verificationSessions.get(userId);
-  const db = await readyDb();
-  if (!db) return void 0;
-  return await db.collection("ownerVerificationSessions").findOne({ userId }, { projection: { _id: 0 } }) ?? void 0;
-}
-async function markOwnerVerified(userId, expiresAt) {
-  const now = /* @__PURE__ */ new Date();
-  if (isTestRuntime()) {
-    const existing = testStore.verificationSessions.get(userId);
-    testStore.verificationSessions.set(userId, { id: existing?.id ?? nextTestId("ownerVerificationSessions"), userId, verifiedAt: now, expiresAt, updatedAt: now });
-    return;
-  }
-  const db = await readyDb();
-  if (!db) throw new Error("MongoDB is not available.");
-  const id = await nextMongoId(db, "ownerVerificationSessions");
-  await db.collection("ownerVerificationSessions").updateOne(
-    { userId },
-    { $set: { verifiedAt: now, expiresAt, updatedAt: now }, $setOnInsert: { id, userId } },
-    { upsert: true }
-  );
-}
-async function clearOwnerVerification(userId) {
-  if (isTestRuntime()) {
-    testStore.verificationSessions.delete(userId);
-    return;
-  }
-  const db = await readyDb();
-  if (!db) throw new Error("MongoDB is not available.");
-  await db.collection("ownerVerificationSessions").deleteOne({ userId });
-}
-
-// server/_core/cookies.ts
-function isSecureRequest(req) {
-  if (req.protocol === "https") return true;
-  const forwardedProto = req.headers["x-forwarded-proto"];
-  if (!forwardedProto) return false;
-  const protoList = Array.isArray(forwardedProto) ? forwardedProto : forwardedProto.split(",");
-  return protoList.some((proto) => proto.trim().toLowerCase() === "https");
-}
-function getSessionCookieOptions(req) {
-  return {
-    httpOnly: true,
-    path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req)
-  };
-}
-
-// shared/_core/errors.ts
-var HttpError = class extends Error {
-  constructor(statusCode, message2) {
-    super(message2);
-    this.statusCode = statusCode;
-    this.name = "HttpError";
-  }
-};
-var ForbiddenError = (msg) => new HttpError(403, msg);
 
 // node_modules/.pnpm/axios@1.12.2/node_modules/axios/lib/helpers/bind.js
 function bind(fn, thisArg) {
@@ -64520,6 +64196,335 @@ var {
   mergeConfig: mergeConfig2
 } = axios_default;
 
+// server/_core/oauth.ts
+var import_cookie2 = __toESM(require_dist(), 1);
+var import_crypto2 = require("crypto");
+
+// server/db.ts
+var import_mongodb = __toESM(require_lib5(), 1);
+
+// server/_core/env.ts
+var ENV = {
+  appId: process.env.VITE_APP_ID ?? "",
+  cookieSecret: process.env.JWT_SECRET ?? "",
+  mongodbUri: process.env.MONGODB_URI ?? "",
+  oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
+  ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
+  githubOauthClientId: process.env.GITHUB_OAUTH_CLIENT_ID ?? "",
+  githubOauthClientSecret: process.env.GITHUB_OAUTH_CLIENT_SECRET ?? "",
+  githubAdminLogin: process.env.GITHUB_ADMIN_LOGIN ?? "",
+  isProduction: process.env.NODE_ENV === "production",
+  forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
+  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? ""
+};
+
+// server/db.ts
+var mongoCache = globalThis.__saniPortfolioMongoCache ?? (globalThis.__saniPortfolioMongoCache = {});
+var indexPromise;
+var testStore = {
+  counters: /* @__PURE__ */ new Map(),
+  users: /* @__PURE__ */ new Map(),
+  settings: /* @__PURE__ */ new Map(),
+  media: /* @__PURE__ */ new Map(),
+  caseStudies: /* @__PURE__ */ new Map(),
+  verificationSessions: /* @__PURE__ */ new Map()
+};
+function isTestRuntime() {
+  return process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+}
+function databaseName(uri) {
+  const configured = process.env.MONGODB_DB?.trim();
+  if (configured) return configured;
+  try {
+    const name = new URL(uri).pathname.replace(/^\//, "").split("/")[0];
+    return name || "sani_portfolio";
+  } catch {
+    return "sani_portfolio";
+  }
+}
+async function getDb() {
+  if (isTestRuntime()) return null;
+  const uri = ENV.mongodbUri;
+  if (!uri) return null;
+  try {
+    if (!mongoCache.client) {
+      mongoCache.promise ??= new import_mongodb.MongoClient(uri, {
+        appName: "sani-virani-portfolio",
+        maxPoolSize: 5,
+        minPoolSize: 0,
+        serverSelectionTimeoutMS: 5e3
+      }).connect();
+      mongoCache.client = await mongoCache.promise;
+    }
+    return mongoCache.client.db(databaseName(uri));
+  } catch (error46) {
+    mongoCache.client = void 0;
+    mongoCache.promise = void 0;
+    console.warn("[MongoDB] Failed to connect:", error46);
+    return null;
+  }
+}
+async function readyDb() {
+  const db = await getDb();
+  if (!db) return null;
+  indexPromise ??= Promise.all([
+    db.collection("users").createIndex({ openId: 1 }, { unique: true }),
+    db.collection("portfolioSettings").createIndex({ key: 1 }, { unique: true }),
+    db.collection("portfolioMedia").createIndex({ id: 1 }, { unique: true }),
+    db.collection("portfolioMedia").createIndex({ key: 1 }, { unique: true }),
+    db.collection("caseStudies").createIndex({ id: 1 }, { unique: true }),
+    db.collection("caseStudies").createIndex({ slug: 1 }, { unique: true }),
+    db.collection("ownerVerificationSessions").createIndex({ userId: 1 }, { unique: true })
+  ]).then(() => void 0).catch((error46) => {
+    indexPromise = void 0;
+    throw error46;
+  });
+  await indexPromise;
+  return db;
+}
+async function nextMongoId(db, key) {
+  const result = await db.collection("portfolioCounters").findOneAndUpdate(
+    { key },
+    { $inc: { value: 1 } },
+    { upsert: true, returnDocument: "after" }
+  );
+  if (!result) throw new Error("Unable to allocate a MongoDB document identifier.");
+  return result.value;
+}
+function nextTestId(key) {
+  const next = (testStore.counters.get(key) ?? 0) + 1;
+  testStore.counters.set(key, next);
+  return next;
+}
+function sortCaseStudies(items) {
+  return items.sort((left, right) => left.sortOrder - right.sortOrder || left.id - right.id);
+}
+function parseJson(value, fallback) {
+  if (typeof value !== "string") return fallback;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+function isDuplicateEntry(error46) {
+  return error46 instanceof import_mongodb.MongoServerError && error46.code === 11e3 || typeof error46 === "object" && error46 !== null && "code" in error46 && error46.code === 11e3;
+}
+async function upsertUser(user) {
+  if (!user.openId) throw new Error("User openId is required for upsert");
+  const now = /* @__PURE__ */ new Date();
+  const updates = {
+    lastSignedIn: user.lastSignedIn ?? now,
+    updatedAt: now
+  };
+  if (user.name !== void 0) updates.name = user.name ?? null;
+  if (user.email !== void 0) updates.email = user.email ?? null;
+  if (user.loginMethod !== void 0) updates.loginMethod = user.loginMethod ?? null;
+  if (user.role) updates.role = user.role;
+  if (isTestRuntime()) {
+    const existing = testStore.users.get(user.openId);
+    testStore.users.set(user.openId, {
+      id: existing?.id ?? nextTestId("users"),
+      openId: user.openId,
+      name: existing?.name ?? null,
+      email: existing?.email ?? null,
+      loginMethod: existing?.loginMethod ?? null,
+      role: user.role ?? existing?.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "user"),
+      createdAt: existing?.createdAt ?? now,
+      lastSignedIn: user.lastSignedIn ?? now,
+      updatedAt: now,
+      ...updates
+    });
+    return;
+  }
+  const db = await readyDb();
+  if (!db) return;
+  const id = await nextMongoId(db, "users");
+  await db.collection("users").updateOne(
+    { openId: user.openId },
+    {
+      $set: updates,
+      $setOnInsert: {
+        id,
+        openId: user.openId,
+        name: null,
+        email: null,
+        loginMethod: null,
+        role: user.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "user"),
+        createdAt: now
+      }
+    },
+    { upsert: true }
+  );
+}
+async function getUserByOpenId(openId) {
+  if (isTestRuntime()) return testStore.users.get(openId);
+  const db = await readyDb();
+  if (!db) return void 0;
+  return await db.collection("users").findOne({ openId }, { projection: { _id: 0 } }) ?? void 0;
+}
+async function getSetting(key, fallback) {
+  if (isTestRuntime()) return testStore.settings.get(key)?.value ?? fallback;
+  const db = await readyDb();
+  if (!db) return fallback;
+  const setting = await db.collection("portfolioSettings").findOne({ key }, { projection: { _id: 0 } });
+  return setting?.value ?? fallback;
+}
+async function getAllSettings() {
+  if (isTestRuntime()) return Array.from(testStore.settings.values());
+  const db = await readyDb();
+  return db ? db.collection("portfolioSettings").find({}, { projection: { _id: 0 } }).toArray() : [];
+}
+async function setSetting(key, value) {
+  const now = /* @__PURE__ */ new Date();
+  if (isTestRuntime()) {
+    testStore.settings.set(key, { key, value, updatedAt: now });
+    return;
+  }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  await db.collection("portfolioSettings").updateOne({ key }, { $set: { value, updatedAt: now }, $setOnInsert: { key } }, { upsert: true });
+}
+async function getCaseStudies(status) {
+  if (isTestRuntime()) return sortCaseStudies(Array.from(testStore.caseStudies.values()).filter((item) => !status || item.status === status));
+  const db = await readyDb();
+  if (!db) return [];
+  return db.collection("caseStudies").find(status ? { status } : {}, { projection: { _id: 0 } }).sort({ sortOrder: 1, id: 1 }).toArray();
+}
+async function createCaseStudy(values) {
+  const now = /* @__PURE__ */ new Date();
+  if (isTestRuntime()) {
+    if (Array.from(testStore.caseStudies.values()).some((item) => item.slug === values.slug)) throw { code: 11e3 };
+    const id2 = nextTestId("caseStudies");
+    testStore.caseStudies.set(id2, { id: id2, ...values, createdAt: now, updatedAt: now });
+    return id2;
+  }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  const id = await nextMongoId(db, "caseStudies");
+  await db.collection("caseStudies").insertOne({ id, ...values, createdAt: now, updatedAt: now });
+  return id;
+}
+async function updateCaseStudy(id, values) {
+  const now = /* @__PURE__ */ new Date();
+  if (isTestRuntime()) {
+    const existing = testStore.caseStudies.get(id);
+    if (!existing) return false;
+    if (Array.from(testStore.caseStudies.values()).some((item) => item.id !== id && item.slug === values.slug)) throw { code: 11e3 };
+    testStore.caseStudies.set(id, { ...existing, ...values, updatedAt: now });
+    return true;
+  }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  return (await db.collection("caseStudies").updateOne({ id }, { $set: { ...values, updatedAt: now } })).matchedCount > 0;
+}
+async function removeCaseStudy(id) {
+  if (isTestRuntime()) {
+    testStore.caseStudies.delete(id);
+    return;
+  }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  await db.collection("caseStudies").deleteOne({ id });
+}
+async function getMedia() {
+  if (isTestRuntime()) return Array.from(testStore.media.values()).sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+  const db = await readyDb();
+  return db ? db.collection("portfolioMedia").find({}, { projection: { _id: 0 } }).sort({ createdAt: 1 }).toArray() : [];
+}
+async function createMedia(values) {
+  const now = /* @__PURE__ */ new Date();
+  if (isTestRuntime()) {
+    if (Array.from(testStore.media.values()).some((item) => item.key === values.key)) throw { code: 11e3 };
+    const id2 = nextTestId("portfolioMedia");
+    testStore.media.set(id2, { id: id2, ...values, createdAt: now, updatedAt: now });
+    return id2;
+  }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  const id = await nextMongoId(db, "portfolioMedia");
+  await db.collection("portfolioMedia").insertOne({ id, ...values, createdAt: now, updatedAt: now });
+  return id;
+}
+async function updateMedia(id, values) {
+  const now = /* @__PURE__ */ new Date();
+  if (isTestRuntime()) {
+    const existing = testStore.media.get(id);
+    if (existing) testStore.media.set(id, { ...existing, ...values, updatedAt: now });
+    return;
+  }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  await db.collection("portfolioMedia").updateOne({ id }, { $set: { ...values, updatedAt: now } });
+}
+async function removeMedia(id) {
+  if (isTestRuntime()) {
+    testStore.media.delete(id);
+    return;
+  }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  await db.collection("portfolioMedia").deleteOne({ id });
+}
+async function getOwnerVerificationSession(userId) {
+  if (isTestRuntime()) return testStore.verificationSessions.get(userId);
+  const db = await readyDb();
+  if (!db) return void 0;
+  return await db.collection("ownerVerificationSessions").findOne({ userId }, { projection: { _id: 0 } }) ?? void 0;
+}
+async function markOwnerVerified(userId, expiresAt) {
+  const now = /* @__PURE__ */ new Date();
+  if (isTestRuntime()) {
+    const existing = testStore.verificationSessions.get(userId);
+    testStore.verificationSessions.set(userId, { id: existing?.id ?? nextTestId("ownerVerificationSessions"), userId, verifiedAt: now, expiresAt, updatedAt: now });
+    return;
+  }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  const id = await nextMongoId(db, "ownerVerificationSessions");
+  await db.collection("ownerVerificationSessions").updateOne(
+    { userId },
+    { $set: { verifiedAt: now, expiresAt, updatedAt: now }, $setOnInsert: { id, userId } },
+    { upsert: true }
+  );
+}
+async function clearOwnerVerification(userId) {
+  if (isTestRuntime()) {
+    testStore.verificationSessions.delete(userId);
+    return;
+  }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  await db.collection("ownerVerificationSessions").deleteOne({ userId });
+}
+
+// server/_core/cookies.ts
+function isSecureRequest(req) {
+  if (req.protocol === "https") return true;
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  if (!forwardedProto) return false;
+  const protoList = Array.isArray(forwardedProto) ? forwardedProto : forwardedProto.split(",");
+  return protoList.some((proto) => proto.trim().toLowerCase() === "https");
+}
+function getSessionCookieOptions(req) {
+  return {
+    httpOnly: true,
+    path: "/",
+    sameSite: "none",
+    secure: isSecureRequest(req)
+  };
+}
+
+// shared/_core/errors.ts
+var HttpError = class extends Error {
+  constructor(statusCode, message2) {
+    super(message2);
+    this.statusCode = statusCode;
+    this.name = "HttpError";
+  }
+};
+var ForbiddenError = (msg) => new HttpError(403, msg);
+
 // server/_core/sdk.ts
 var import_cookie = __toESM(require_dist(), 1);
 
@@ -65868,292 +65873,186 @@ var SignJWT = class {
 
 // server/_core/sdk.ts
 var isNonEmptyString = (value) => typeof value === "string" && value.length > 0;
-var EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
-var GET_USER_INFO_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfo`;
-var GET_USER_INFO_WITH_JWT_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfoWithJwt`;
-var OAuthService = class {
-  constructor(client) {
-    this.client = client;
-    console.log("[OAuth] Initialized with baseURL:", ENV.oAuthServerUrl);
-    if (!ENV.oAuthServerUrl) {
-      console.error(
-        "[OAuth] ERROR: OAUTH_SERVER_URL is not configured! Set OAUTH_SERVER_URL environment variable."
-      );
-    }
-  }
-  decodeState(state) {
-    return decodeOAuthState(state).redirectUri;
-  }
-  async getTokenByCode(code, state) {
-    const payload = {
-      clientId: ENV.appId,
-      grantType: "authorization_code",
-      code,
-      redirectUri: this.decodeState(state)
-    };
-    const { data } = await this.client.post(
-      EXCHANGE_TOKEN_PATH,
-      payload
-    );
-    return data;
-  }
-  async getUserInfoByToken(token) {
-    const { data } = await this.client.post(
-      GET_USER_INFO_PATH,
-      {
-        accessToken: token.accessToken
-      }
-    );
-    return data;
-  }
-};
-var createOAuthHttpClient = () => axios_default.create({
-  baseURL: ENV.oAuthServerUrl,
-  timeout: AXIOS_TIMEOUT_MS
-});
-var SDKServer = class {
-  client;
-  oauthService;
-  constructor(client = createOAuthHttpClient()) {
-    this.client = client;
-    this.oauthService = new OAuthService(this.client);
-  }
-  deriveLoginMethod(platforms, fallback) {
-    if (fallback && fallback.length > 0) return fallback;
-    if (!Array.isArray(platforms) || platforms.length === 0) return null;
-    const set2 = new Set(
-      platforms.filter((p) => typeof p === "string")
-    );
-    if (set2.has("REGISTERED_PLATFORM_EMAIL")) return "email";
-    if (set2.has("REGISTERED_PLATFORM_GOOGLE")) return "google";
-    if (set2.has("REGISTERED_PLATFORM_APPLE")) return "apple";
-    if (set2.has("REGISTERED_PLATFORM_MICROSOFT") || set2.has("REGISTERED_PLATFORM_AZURE"))
-      return "microsoft";
-    if (set2.has("REGISTERED_PLATFORM_GITHUB")) return "github";
-    const first = Array.from(set2)[0];
-    return first ? first.toLowerCase() : null;
-  }
-  /**
-   * Exchange OAuth authorization code for access token
-   * @example
-   * const tokenResponse = await sdk.exchangeCodeForToken(code, state);
-   */
-  async exchangeCodeForToken(code, state) {
-    return this.oauthService.getTokenByCode(code, state);
-  }
-  /**
-   * Get user information using access token
-   * @example
-   * const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
-   */
-  async getUserInfo(accessToken) {
-    const data = await this.oauthService.getUserInfoByToken({
-      accessToken
-    });
-    const loginMethod = this.deriveLoginMethod(
-      data?.platforms,
-      data?.platform ?? data.platform ?? null
-    );
-    return {
-      ...data,
-      platform: loginMethod,
-      loginMethod
-    };
-  }
+var SessionService = class {
   parseCookies(cookieHeader) {
-    if (!cookieHeader) {
-      return /* @__PURE__ */ new Map();
-    }
-    const parsed = (0, import_cookie.parse)(cookieHeader);
-    return new Map(Object.entries(parsed));
+    if (!cookieHeader) return /* @__PURE__ */ new Map();
+    return new Map(Object.entries((0, import_cookie.parse)(cookieHeader)));
   }
   getSessionSecret() {
-    const secret = ENV.cookieSecret;
-    return new TextEncoder().encode(secret);
+    if (!ENV.cookieSecret) {
+      throw ForbiddenError("Session signing is not configured");
+    }
+    return new TextEncoder().encode(ENV.cookieSecret);
   }
-  /**
-   * Create a session token for a Manus user openId
-   * @example
-   * const sessionToken = await sdk.createSessionToken(userInfo.openId);
-   */
   async createSessionToken(openId, options = {}) {
     return this.signSession(
-      {
-        openId,
-        appId: ENV.appId,
-        name: options.name || ""
-      },
+      { openId, appId: "github", name: options.name || "" },
       options
     );
   }
   async signSession(payload, options = {}) {
-    const issuedAt = Date.now();
-    const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
-    const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1e3);
-    const secretKey = this.getSessionSecret();
-    return new SignJWT({
-      openId: payload.openId,
-      appId: payload.appId,
-      name: payload.name
-    }).setProtectedHeader({ alg: "HS256", typ: "JWT" }).setExpirationTime(expirationSeconds).sign(secretKey);
+    const expirationSeconds = Math.floor(
+      (Date.now() + (options.expiresInMs ?? ONE_YEAR_MS)) / 1e3
+    );
+    return new SignJWT(payload).setProtectedHeader({ alg: "HS256", typ: "JWT" }).setExpirationTime(expirationSeconds).sign(this.getSessionSecret());
   }
   async verifySession(cookieValue) {
-    if (!cookieValue) {
-      console.warn("[Auth] Missing session cookie");
-      return null;
-    }
+    if (!cookieValue) return null;
     try {
-      const secretKey = this.getSessionSecret();
-      const { payload } = await jwtVerify(cookieValue, secretKey, {
+      const { payload } = await jwtVerify(cookieValue, this.getSessionSecret(), {
         algorithms: ["HS256"]
       });
       const { openId, appId, name } = payload;
       if (!isNonEmptyString(openId) || !isNonEmptyString(appId) || !isNonEmptyString(name)) {
-        console.warn("[Auth] Session payload missing required fields");
         return null;
       }
-      return {
-        openId,
-        appId,
-        name
-      };
-    } catch (error46) {
-      console.warn("[Auth] Session verification failed", String(error46));
+      return { openId, appId, name };
+    } catch {
       return null;
     }
-  }
-  async getUserInfoWithJwt(jwtToken) {
-    const payload = {
-      jwtToken,
-      projectId: ENV.appId
-    };
-    const { data } = await this.client.post(
-      GET_USER_INFO_WITH_JWT_PATH,
-      payload
-    );
-    const loginMethod = this.deriveLoginMethod(
-      data?.platforms,
-      data?.platform ?? data.platform ?? null
-    );
-    return {
-      ...data,
-      platform: loginMethod,
-      loginMethod
-    };
   }
   async authenticateRequest(req) {
     const cookies = this.parseCookies(req.headers.cookie);
     let sessionToken = cookies.get(COOKIE_NAME);
     if (!sessionToken) {
-      const authHeader = req.headers.authorization;
-      if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
-        sessionToken = authHeader.slice(7);
+      const authorization = req.headers.authorization;
+      if (typeof authorization === "string" && authorization.startsWith("Bearer ")) {
+        sessionToken = authorization.slice(7);
       }
     }
     const session = await this.verifySession(sessionToken);
-    if (!session) {
+    if (!session || session.appId !== "github") {
       throw ForbiddenError("Invalid session cookie");
     }
-    if (session.openId.startsWith(CRON_OPEN_ID_PREFIX)) {
-      const userInfo = await this.getUserInfoWithJwt(sessionToken ?? "");
-      const taskUid = userInfo.taskUid ?? null;
-      if (!taskUid) {
-        throw ForbiddenError("Cron session missing task_uid");
-      }
-      return buildCronUser(userInfo);
-    }
-    const sessionUserId = session.openId;
-    const signedInAt = /* @__PURE__ */ new Date();
-    let user = await getUserByOpenId(sessionUserId);
-    if (!user) {
-      try {
-        const userInfo = await this.getUserInfoWithJwt(sessionToken ?? "");
-        await upsertUser({
-          openId: userInfo.openId,
-          name: userInfo.name || null,
-          email: userInfo.email ?? null,
-          loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
-          lastSignedIn: signedInAt
-        });
-        user = await getUserByOpenId(userInfo.openId);
-      } catch (error46) {
-        console.error("[Auth] Failed to sync user from OAuth:", error46);
-        throw ForbiddenError("Failed to sync user info");
-      }
-    }
-    if (!user) {
-      throw ForbiddenError("User not found");
-    }
-    await upsertUser({
-      openId: user.openId,
-      lastSignedIn: signedInAt
-    });
+    const user = await getUserByOpenId(session.openId);
+    if (!user) throw ForbiddenError("User not found");
+    await upsertUser({ openId: user.openId, lastSignedIn: /* @__PURE__ */ new Date() });
     return user;
   }
 };
-var CRON_OPEN_ID_PREFIX = "cron_";
-function buildCronUser(userInfo) {
-  const now = /* @__PURE__ */ new Date();
-  return {
-    id: -1,
-    openId: userInfo.openId,
-    name: userInfo.name || "Manus Scheduled Task",
-    email: null,
-    loginMethod: null,
-    role: "user",
-    createdAt: now,
-    updatedAt: now,
-    lastSignedIn: now,
-    taskUid: userInfo.taskUid ?? void 0,
-    isCron: true
-  };
-}
-var sdk = new SDKServer();
+var sdk = new SessionService();
 
 // server/_core/oauth.ts
-function getQueryParam(req, key) {
-  const value = req.query[key];
-  return typeof value === "string" ? value : void 0;
+function requestOrigin(req) {
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const protocol = typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() : req.protocol;
+  const host = req.get("host");
+  return host ? `${protocol}://${host}` : "";
+}
+function githubCallbackUrl(origin2) {
+  return `${origin2}/api/oauth/callback`;
+}
+function buildGitHubAuthorizationUrl(input) {
+  const url3 = new URL("https://github.com/login/oauth/authorize");
+  url3.searchParams.set("client_id", input.clientId);
+  url3.searchParams.set("redirect_uri", input.redirectUri);
+  url3.searchParams.set("state", input.state);
+  url3.searchParams.set("scope", "read:user");
+  url3.searchParams.set("allow_signup", "false");
+  return url3.toString();
+}
+function matchesGitHubAdminLogin(login, configuredLogin) {
+  return Boolean(login && configuredLogin) && login.trim().toLowerCase() === configuredLogin.trim().toLowerCase();
+}
+function missingGitHubConfiguration(res) {
+  res.status(503).json({ error: "GitHub OAuth is not configured" });
+}
+function validCallbackState(req, state) {
+  const decoded = decodeOAuthState(state);
+  const expectedNonce = (0, import_cookie2.parse)(req.headers.cookie ?? "")[OAUTH_STATE_COOKIE];
+  const callbackUrl = githubCallbackUrl(requestOrigin(req));
+  return Boolean(decoded.nonce && expectedNonce && decoded.nonce === expectedNonce && decoded.redirectUri === callbackUrl);
 }
 function registerOAuthRoutes(app) {
+  app.get("/api/oauth/github", (req, res) => {
+    if (!ENV.githubOauthClientId) {
+      missingGitHubConfiguration(res);
+      return;
+    }
+    const callbackUrl = githubCallbackUrl(requestOrigin(req));
+    if (!callbackUrl || !callbackUrl.startsWith("https://")) {
+      res.status(400).json({ error: "A secure OAuth callback origin is required" });
+      return;
+    }
+    const nonce = (0, import_crypto2.randomUUID)();
+    const state = encodeOAuthState({ redirectUri: callbackUrl, nonce });
+    res.cookie(OAUTH_STATE_COOKIE, nonce, {
+      ...getSessionCookieOptions(req),
+      httpOnly: true,
+      maxAge: 10 * 60 * 1e3
+    });
+    res.redirect(302, buildGitHubAuthorizationUrl({
+      clientId: ENV.githubOauthClientId,
+      redirectUri: callbackUrl,
+      state
+    }));
+  });
   app.get("/api/oauth/callback", async (req, res) => {
-    const code = getQueryParam(req, "code");
-    const state = getQueryParam(req, "state");
+    const code = typeof req.query.code === "string" ? req.query.code : void 0;
+    const state = typeof req.query.state === "string" ? req.query.state : void 0;
     if (!code || !state) {
       res.status(400).json({ error: "code and state are required" });
       return;
     }
-    const { nonce } = decodeOAuthState(state);
-    const expectedNonce = (0, import_cookie2.parse)(req.headers.cookie ?? "")[OAUTH_STATE_COOKIE];
-    if (!nonce || nonce !== expectedNonce) {
+    if (!validCallbackState(req, state)) {
       res.status(403).json({ error: "invalid oauth state" });
       return;
     }
-    res.clearCookie(OAUTH_STATE_COOKIE, { path: "/", secure: true, sameSite: "none" });
+    if (!ENV.githubOauthClientId || !ENV.githubOauthClientSecret || !ENV.githubAdminLogin || !ENV.cookieSecret) {
+      missingGitHubConfiguration(res);
+      return;
+    }
+    res.clearCookie(OAUTH_STATE_COOKIE, { ...getSessionCookieOptions(req), maxAge: 0 });
     try {
-      const tokenResponse = await sdk.exchangeCodeForToken(code, state);
-      const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
-      if (!userInfo.openId) {
-        res.status(400).json({ error: "openId missing from user info" });
+      const callbackUrl = githubCallbackUrl(requestOrigin(req));
+      const tokenResponse = await axios_default.post(
+        "https://github.com/login/oauth/access_token",
+        {
+          client_id: ENV.githubOauthClientId,
+          client_secret: ENV.githubOauthClientSecret,
+          code,
+          redirect_uri: callbackUrl
+        },
+        { headers: { Accept: "application/json" }, timeout: AXIOS_TIMEOUT_MS }
+      );
+      const accessToken = tokenResponse.data.access_token;
+      if (!accessToken) throw new Error("GitHub did not return an access token");
+      const profileResponse = await axios_default.get("https://api.github.com/user", {
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${accessToken}`,
+          "User-Agent": "sani-virani-portfolio"
+        },
+        timeout: AXIOS_TIMEOUT_MS
+      });
+      const profile = profileResponse.data;
+      if (!profile.login || !Number.isInteger(profile.id)) throw new Error("GitHub profile is incomplete");
+      if (!matchesGitHubAdminLogin(profile.login, ENV.githubAdminLogin)) {
+        res.status(403).json({ error: "This GitHub account is not authorized for Content Studio" });
         return;
       }
+      const openId = `github:${profile.id}`;
       await upsertUser({
-        openId: userInfo.openId,
-        name: userInfo.name || null,
-        email: userInfo.email ?? null,
-        loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
+        openId,
+        name: profile.name || profile.login,
+        email: profile.email ?? null,
+        loginMethod: "github",
+        role: "admin",
         lastSignedIn: /* @__PURE__ */ new Date()
       });
-      const sessionToken = await sdk.createSessionToken(userInfo.openId, {
-        name: userInfo.name || "",
+      await markOwnerVerified(
+        (await getUserByOpenId(openId)).id,
+        new Date(Date.now() + ONE_YEAR_MS)
+      );
+      const sessionToken = await sdk.createSessionToken(openId, {
+        name: profile.name || profile.login,
         expiresInMs: ONE_YEAR_MS
       });
-      const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      res.redirect(302, "/");
+      res.cookie(COOKIE_NAME, sessionToken, { ...getSessionCookieOptions(req), maxAge: ONE_YEAR_MS });
+      res.redirect(302, "/admin");
     } catch (error46) {
-      console.error("[OAuth] Callback failed", error46);
-      res.status(500).json({ error: "OAuth callback failed" });
+      console.error("[GitHub OAuth] Callback failed", error46);
+      res.status(500).json({ error: "GitHub OAuth callback failed" });
     }
   });
 }
@@ -78912,6 +78811,11 @@ var ownerVerificationRouter = router({
     return { verified, expiresAt: verified ? session?.expiresAt ?? null : null };
   }),
   verifyPin: adminProcedure.input(external_exports.object({ pin: external_exports.string().min(1).max(128), phone: external_exports.string().min(8).max(20) })).mutation(async ({ input, ctx }) => {
+    if (ctx.user.loginMethod === "github" && ctx.user.role === "admin") {
+      const expiresAt2 = new Date(Date.now() + 30 * 60 * 1e3);
+      await markOwnerVerified(ctx.user.id, expiresAt2);
+      return { verified: true, expiresAt: expiresAt2 };
+    }
     if (!process.env.ADMIN_OWNER_PIN || !process.env.ADMIN_OWNER_PHONE) {
       throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Owner verification is not configured." });
     }

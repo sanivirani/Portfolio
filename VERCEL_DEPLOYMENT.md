@@ -2,7 +2,7 @@
 
 This repository has a Vercel-ready build configuration. It separates the Vite client build from the Express application and emits a self-contained CommonJS serverless entrypoint at `api/[...path].js` for the existing same-origin API endpoints. The `api/package.json` CommonJS boundary preserves Express dependency loading while keeping the artifact visible to Vercel as a standard JavaScript function. The configured fallback excludes `/api/*` so API requests reach the Vercel Function, while client-side routes such as `/admin` resolve to the Vite application after a refresh.
 
-> **Current status:** The public portfolio is live at `https://portfolio-henna-nu-35.vercel.app`. MongoDB Atlas is linked through Vercel for Production and Preview, and the public portfolio API has been verified against the Atlas-backed data path. Content Studio sign-in and editing are deliberately deferred until the OAuth and owner-verification values in Section 4 are configured. Existing images and the resume still use the temporary Manus media rewrite described in Section 5.
+> **Current status:** The public portfolio is live at `https://portfolio-henna-nu-35.vercel.app`. MongoDB Atlas is linked through Vercel for Production and Preview, and the public portfolio API has been verified against the Atlas-backed data path. GitHub OAuth is configured for the `sanivirani` administrator account; redeploy after the GitHub OAuth code is pushed. Existing images and the resume still use the temporary Manus media rewrite described in Section 5.
 
 ## 1. Import the repository
 
@@ -20,15 +20,12 @@ The repository intentionally does not include a committed `.env.example`, becaus
 |---|---:|---|---|
 | `MONGODB_URI` | Yes | Cached MongoDB Atlas client and Content Studio collections | Use the Atlas `mongodb+srv://…` connection URI. Add it as a secret, never in the browser bundle. |
 | `MONGODB_DB` | No | MongoDB database selection | Defaults to the database in `MONGODB_URI`, or `sani_portfolio` when no database name is present. |
-| `JWT_SECRET` | Content Studio only | Session signing and verification | Generate a long random secret; use the same value for all Production instances. |
-| `VITE_APP_ID` | Content Studio only | Browser OAuth login start | OAuth application identifier. This value is visible in the client bundle. |
-| `VITE_OAUTH_PORTAL_URL` | Content Studio only | Browser OAuth login start | OAuth portal base URL, without a trailing callback path. This value is visible in the client bundle. |
-| `OAUTH_SERVER_URL` | Content Studio only | Server OAuth code exchange and profile lookup | OAuth provider API base URL. |
-| `OWNER_OPEN_ID` | Content Studio only | Owner/admin role assignment | Stable owner identifier returned by the configured OAuth provider. |
-| `ADMIN_OWNER_PHONE` | Content Studio only | Content Studio owner confirmation | Authorized phone value used by the existing local confirmation step. |
-| `ADMIN_OWNER_PIN` | Content Studio only | Content Studio owner confirmation | A private PIN; rotate it if it has been exposed. |
+| `JWT_SECRET` | Content Studio only | First-party session signing and verification | Generate a long random secret; use the same value for all Production instances. |
+| `GITHUB_OAUTH_CLIENT_ID` | Content Studio only | Server-side GitHub authorization redirect | Client ID from the GitHub OAuth app. It is safe to treat this as configuration, but keeping it server-side avoids unnecessary browser exposure. |
+| `GITHUB_OAUTH_CLIENT_SECRET` | Content Studio only | GitHub authorization-code exchange | Generate this in GitHub, store it as a Vercel secret, and never commit or paste it into chat. |
+| `GITHUB_ADMIN_LOGIN` | Content Studio only | Administrator authorization | The exact GitHub username permitted to administer Content Studio, such as `sanivirani`. |
 
-`VITE_*` variables are compiled into the browser build, so they must never contain database credentials, API keys, or other secrets. Vercel supports separate Local, Preview, and Production variable values; use a non-production database for Preview whenever possible.[2] [3]
+Vercel supports separate Local, Preview, and Production variable values; use a non-production database for Preview whenever possible.[2] [3]
 
 ## 3. Configure MongoDB Atlas
 
@@ -46,21 +43,19 @@ Create a database user with `readWrite` access to the selected portfolio databas
 
 Vercel Functions use dynamic outbound IP addresses. When you connect Atlas directly, configure an Atlas IP Access List rule that permits Vercel connectivity. MongoDB documents that the Vercel integration uses `0.0.0.0/0` because of these dynamic addresses; this permits connections from anywhere, so use strong, unique database credentials and grant only the minimum database role.[5] [6]
 
-## 4. Configure OAuth before enabling Content Studio
+## 4. Configure GitHub OAuth for Content Studio
 
-### Public-only deployment mode
-
-The public portfolio does **not** require the OAuth or owner-verification variables above. With `MONGODB_URI` configured, visitors can load the public site and its portfolio data normally. This is the currently approved production mode. Keep Content Studio access disabled until the values below have been intentionally configured.
-
-The login flow calculates its redirect URI from the current origin. Register the following callback URI with the same OAuth/Manus application that supplies `VITE_APP_ID`:
+The public portfolio does **not** require GitHub OAuth. When Content Studio editing is needed, create a GitHub OAuth App under the portfolio owner’s GitHub account and register the exact Vercel callback URI:
 
 ```text
-https://YOUR-VERCEL-DOMAIN/api/oauth/callback
+https://portfolio-henna-nu-35.vercel.app/api/oauth/callback
 ```
 
-Add Preview callback URLs only if your OAuth provider allows them. The existing application signs a secure, same-site OAuth nonce cookie before redirecting; use HTTPS and do not change the callback path.
+Use `https://portfolio-henna-nu-35.vercel.app` as the homepage URL. The server requests only GitHub’s `read:user` scope, validates a one-time state cookie, exchanges the authorization code on the server, and issues its own signed first-party session. GitHub requires the `redirect_uri` at exchange time to match a registered callback URL.[7] [8]
 
-If the OAuth provider is restricted to Manus hosting or cannot register the Vercel domain, the public portfolio can still deploy, but authenticated Content Studio and owner verification will not work until you replace the provider or register a Vercel-compatible OAuth client.
+The GitHub OAuth app named **Sani Virani Content Studio** is already registered for this production URL. Add its Client ID as `GITHUB_OAUTH_CLIENT_ID`, generate a Client Secret and add it as `GITHUB_OAUTH_CLIENT_SECRET`, set `GITHUB_ADMIN_LOGIN` to `sanivirani`, and create `JWT_SECRET` as a Vercel secret. GitHub sign-in is accepted only when the returned GitHub username matches `GITHUB_ADMIN_LOGIN`, so it also functions as the owner verification factor. Do not add phone or PIN values unless you later elect to restore the separate legacy verification flow.
+
+For Preview deployments, add a separate GitHub OAuth callback URL only after choosing a stable Preview domain. Do not use a random preview URL as the production callback.
 
 ## 5. Migrate media before fully leaving Manus
 
@@ -83,8 +78,8 @@ Test the following in the Preview deployment before assigning a production domai
 
 1. Open `/` and refresh `/admin` to verify SPA deep links.
 2. Confirm `/api/trpc` responds and the public portfolio loads its content.
-3. Sign in through OAuth and confirm the callback returns to the Vercel domain.
-4. Verify the Content Studio owner confirmation, a content save, the resume download, and every media asset.
+3. Sign in through GitHub using the configured administrator account and confirm the callback returns to `/admin` on the Vercel domain.
+4. Verify Content Studio can save an authorized change, then confirm the resume download and every media asset.
 
 Use `vercel env pull` after linking a local clone to fetch Development settings for local Vercel testing.[2]
 
@@ -107,3 +102,5 @@ Then confirm `http://localhost:3101/api/oauth/callback` returns the application'
 [4]: https://vercel.com/docs/frameworks/frontend/vite "Vite on Vercel"
 [5]: https://www.mongodb.com/docs/atlas/reference/partner-integrations/vercel/ "MongoDB Atlas: Integrate with Vercel"
 [6]: https://www.mongodb.com/docs/atlas/security/ip-access-list/ "MongoDB Atlas: Configure IP Access List Entries"
+[7]: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app "GitHub Docs: Creating an OAuth app"
+[8]: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps "GitHub Docs: Authorizing OAuth apps"

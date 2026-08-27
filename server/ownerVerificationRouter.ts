@@ -29,6 +29,11 @@ export const ownerVerificationRouter = router({
   verifyPin: adminProcedure
     .input(z.object({ pin: z.string().min(1).max(128), phone: z.string().min(8).max(20) }))
     .mutation(async ({ input, ctx }) => {
+      if (ctx.user.loginMethod === "github" && ctx.user.role === "admin") {
+        const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+        await db.markOwnerVerified(ctx.user.id, expiresAt);
+        return { verified: true, expiresAt } as const;
+      }
       if (!process.env.ADMIN_OWNER_PIN || !process.env.ADMIN_OWNER_PHONE) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Owner verification is not configured." });
       }

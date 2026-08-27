@@ -59,4 +59,17 @@ describe("MongoDB portfolio persistence contract", () => {
     await db.clearOwnerVerification(42);
     await expect(db.getOwnerVerificationSession(42)).resolves.toBeUndefined();
   });
+
+  it("persists an explicitly assigned GitHub administrator role", async () => {
+    await db.upsertUser({
+      openId: "github:103173775",
+      name: "Sani Virani",
+      loginMethod: "github",
+      role: "admin",
+    });
+
+    await expect(db.getUserByOpenId("github:103173775")).resolves.toEqual(
+      expect.objectContaining({ loginMethod: "github", role: "admin" }),
+    );
+  });
 });
