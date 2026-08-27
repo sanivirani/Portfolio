@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
 
-const vercelApiPromise = import(new URL("../api/[...path].cjs", import.meta.url).href) as Promise<{
+const vercelApiPromise = import(new URL("../api/[...path].js", import.meta.url).href) as Promise<{
   default: Parameters<typeof createServer>[0];
 }>;
 
@@ -13,9 +13,9 @@ describe("Vercel deployment configuration", () => {
 
     expect(config.buildCommand).toBe("pnpm build:client");
     expect(config.outputDirectory).toBe("dist/public");
-    expect(config.functions["api/[...path].cjs"].maxDuration).toBe(30);
+    expect(config.functions["api/[...path].js"].maxDuration).toBe(30);
     expect(config.rewrites).toEqual(expect.arrayContaining([
-      expect.objectContaining({ source: "/api/:path*", destination: "/api/[...path].cjs" }),
+      expect.objectContaining({ source: "/api/:path*", destination: "/api/[...path].js" }),
       expect.objectContaining({ source: "/:path((?!api/).*)", destination: "/index.html" }),
       expect.objectContaining({ source: "/manus-storage/:path*" }),
     ]));

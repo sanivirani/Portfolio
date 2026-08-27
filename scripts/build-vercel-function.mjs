@@ -2,7 +2,7 @@ import { build } from "esbuild";
 
 await build({
   entryPoints: ["api/_handler.cts"],
-  outfile: "api/[...path].cjs",
+  outfile: "api/[...path].js",
   bundle: true,
   platform: "node",
   target: "node24",

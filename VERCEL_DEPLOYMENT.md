@@ -1,6 +1,6 @@
 # Vercel Deployment Guide
 
-This repository now has a Vercel-ready build configuration. It separates the Vite client build from the Express application and emits a self-contained CommonJS serverless entrypoint at `api/[...path].cjs` for the existing same-origin API endpoints. The configured fallback excludes `/api/*` so API requests reach the Vercel Function, while client-side routes such as `/admin` resolve to the Vite application after a refresh.
+This repository now has a Vercel-ready build configuration. It separates the Vite client build from the Express application and emits a self-contained CommonJS serverless entrypoint at `api/[...path].js` for the existing same-origin API endpoints. The `api/package.json` CommonJS boundary preserves Express dependency loading while keeping the artifact visible to Vercel as a standard JavaScript function. The configured fallback excludes `/api/*` so API requests reach the Vercel Function, while client-side routes such as `/admin` resolve to the Vite application after a refresh.
 
 > **Important:** The current Manus deployment remains the recommended live environment until the external database, OAuth callback, and media migration steps below are complete. The project currently uses Manus services for its published media and OAuth integration.
 
