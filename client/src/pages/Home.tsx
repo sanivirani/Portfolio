@@ -27,6 +27,7 @@ import {
   projectMatchesFilters,
 } from "@/content/portfolio";
 import { trpc } from "@/lib/trpc";
+import { contentStudioHrefForOrigin } from "@shared/contentStudioRouting";
 
 const assetUrls = {
   jewelry: "/manus-storage/jewelry-editorial_bb3146ba.jpg",
@@ -47,6 +48,7 @@ export default function Home() {
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [emailCopied, setEmailCopied] = useState(false);
   const { data: managedSite } = trpc.portfolio.public.site.useQuery();
+  const contentStudioHref = contentStudioHrefForOrigin(window.location.origin);
 
   useEffect(() => {
     const revealTargets = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
@@ -350,7 +352,7 @@ export default function Home() {
       <footer className="footer page-width">
         <span>© {new Date().getFullYear()} {content.name}</span>
         <span>{editorial.footerTagline}</span>
-        <a href="/admin">{editorial.studioLabel} <ArrowUpRight size={13} aria-hidden="true" /></a>
+        <a href={contentStudioHref}>{editorial.studioLabel} <ArrowUpRight size={13} aria-hidden="true" /></a>
       </footer>
     </div>
   );
