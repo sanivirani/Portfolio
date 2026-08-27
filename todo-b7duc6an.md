@@ -50,7 +50,7 @@
 - [x] Verify the synchronized repository export and provide the Vercel import handoff.
 - [x] Provide the verified GitHub repository URL and explain the remaining Vercel import or reconnection step.
 - [x] Inspect the connected Vercel account and confirm the available Portfolio import path.
-- [ ] Create or reconnect the Vercel project to `sanivirani/Portfolio` with the checked-in serverless configuration.
+- [x] Create or reconnect the Vercel project to `sanivirani/Portfolio` with the checked-in serverless configuration.
 - [ ] Configure the required production environment variables, database connection, and OAuth callback before deployment.
 - [ ] Deploy, verify API and public-site behavior, and provide the Vercel production URL.
 - [x] Assess replacing the current MySQL/TiDB and Drizzle data layer with MongoDB for Vercel deployment.
@@ -60,7 +60,9 @@
 - [x] Convert users, portfolio settings, media, case studies, and owner-verification persistence to MongoDB collections while preserving tRPC response contracts.
 - [x] Replace MySQL-specific tests, schema references, and Vercel instructions with MongoDB Atlas validation and setup guidance.
 - [ ] Configure `MONGODB_URI` and the remaining production variables in Vercel after the MongoDB Atlas cluster is ready.
-- [ ] Complete the remaining Vercel import-form setup and explicitly confirm the project creation or reconnection state.
-- [ ] After the Vercel project exists, verify the import settings match the checked-in contract: Vite, root `./`, build `pnpm build:client`, and output `dist/public`.
-- [ ] Diagnose and correct the Vercel deployment so `/api/oauth/callback` is served by the serverless Express function instead of returning `404 NOT_FOUND`.
-- [ ] Redeploy the corrected serverless routing configuration and verify the deployed API callback returns the expected 400 JSON validation response.
+- [x] Complete the remaining Vercel import-form setup and explicitly confirm the project creation or reconnection state.
+- [x] After the Vercel project exists, verify the import settings match the checked-in contract: Vite, root `./`, build `pnpm build:client`, and output `dist/public`.
+- [x] Diagnose and correct the Vercel deployment so `/api/oauth/callback` is served by the serverless Express function instead of returning `404 NOT_FOUND`.
+- [x] Redeploy the corrected serverless routing configuration and verify the deployed API callback returns the expected 400 JSON validation response.
+- [x] Verify the live Vercel OAuth callback response headers and JSON payload for missing parameters, and correct the response if it differs from the documented contract.
+- [x] Provide a beginner-friendly, from-scratch MongoDB Atlas and Vercel connection guide tailored to this Portfolio project.
