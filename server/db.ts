@@ -1,145 +1,377 @@
-import { asc, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
-import {
-  caseStudies,
-  CaseStudy,
-  InsertUser,
-  ownerVerificationSessions,
-  portfolioMedia,
-  PortfolioMedia,
-  portfolioSettings,
-  users,
-} from "../drizzle/schema";
+import { MongoClient, MongoServerError, type Db } from "mongodb";
 import { ENV } from "./_core/env";
 
-let _db: ReturnType<typeof drizzle> | null = null;
+export type PortfolioRole = "user" | "admin";
 
-export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
-    try { _db = drizzle(process.env.DATABASE_URL); } catch (error) { console.warn("[Database] Failed to connect:", error); _db = null; }
-  }
-  return _db;
+export type User = {
+  id: number;
+  openId: string;
+  name: string | null;
+  email: string | null;
+  loginMethod: string | null;
+  role: PortfolioRole;
+  createdAt: Date;
+  updatedAt: Date;
+  lastSignedIn: Date;
+};
+
+export type InsertUser = Pick<User, "openId"> & Partial<Omit<User, "id" | "openId" | "createdAt" | "updatedAt">>;
+
+export type PortfolioSetting = { key: string; value: unknown; updatedAt: Date };
+
+export type PortfolioMedia = {
+  id: number;
+  name: string;
+  key: string;
+  url: string;
+  mimeType: string;
+  altText: string;
+  caption: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type CaseStudy = {
+  id: number;
+  slug: string;
+  title: string;
+  label: string;
+  industry: string;
+  role: string | null;
+  description: string;
+  focus: string;
+  tone: "violet" | "lime" | "sand";
+  services: string;
+  technologies: string;
+  metrics: string;
+  mediaId: number | null;
+  sortOrder: number;
+  status: "draft" | "published";
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type OwnerVerificationSession = {
+  id: number;
+  userId: number;
+  verifiedAt: Date;
+  expiresAt: Date;
+  updatedAt: Date;
+};
+
+type Counter = { key: string; value: number };
+type CaseStudyValues = Omit<CaseStudy, "id" | "createdAt" | "updatedAt">;
+type MediaValues = Omit<PortfolioMedia, "id" | "createdAt" | "updatedAt">;
+type MongoCache = { client?: MongoClient; promise?: Promise<MongoClient> };
+
+declare global {
+  // Cached across warm Vercel function invocations to avoid opening a new connection pool per request.
+  // eslint-disable-next-line no-var
+  var __saniPortfolioMongoCache: MongoCache | undefined;
 }
 
-export function parseJson<T>(value: string, fallback: T): T {
+const mongoCache = globalThis.__saniPortfolioMongoCache ?? (globalThis.__saniPortfolioMongoCache = {});
+let indexPromise: Promise<void> | undefined;
+
+const testStore = {
+  counters: new Map<string, number>(),
+  users: new Map<string, User>(),
+  settings: new Map<string, PortfolioSetting>(),
+  media: new Map<number, PortfolioMedia>(),
+  caseStudies: new Map<number, CaseStudy>(),
+  verificationSessions: new Map<number, OwnerVerificationSession>(),
+};
+
+function isTestRuntime() {
+  return process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+}
+
+function databaseName(uri: string) {
+  const configured = process.env.MONGODB_DB?.trim();
+  if (configured) return configured;
+  try {
+    const name = new URL(uri).pathname.replace(/^\//, "").split("/")[0];
+    return name || "sani_portfolio";
+  } catch {
+    return "sani_portfolio";
+  }
+}
+
+export async function getDb(): Promise<Db | null> {
+  if (isTestRuntime()) return null;
+  const uri = ENV.mongodbUri;
+  if (!uri) return null;
+
+  try {
+    if (!mongoCache.client) {
+      mongoCache.promise ??= new MongoClient(uri, {
+        appName: "sani-virani-portfolio",
+        maxPoolSize: 5,
+        minPoolSize: 0,
+        serverSelectionTimeoutMS: 5_000,
+      }).connect();
+      mongoCache.client = await mongoCache.promise;
+    }
+    return mongoCache.client.db(databaseName(uri));
+  } catch (error) {
+    mongoCache.client = undefined;
+    mongoCache.promise = undefined;
+    console.warn("[MongoDB] Failed to connect:", error);
+    return null;
+  }
+}
+
+async function readyDb() {
+  const db = await getDb();
+  if (!db) return null;
+  indexPromise ??= Promise.all([
+    db.collection<User>("users").createIndex({ openId: 1 }, { unique: true }),
+    db.collection<PortfolioSetting>("portfolioSettings").createIndex({ key: 1 }, { unique: true }),
+    db.collection<PortfolioMedia>("portfolioMedia").createIndex({ id: 1 }, { unique: true }),
+    db.collection<PortfolioMedia>("portfolioMedia").createIndex({ key: 1 }, { unique: true }),
+    db.collection<CaseStudy>("caseStudies").createIndex({ id: 1 }, { unique: true }),
+    db.collection<CaseStudy>("caseStudies").createIndex({ slug: 1 }, { unique: true }),
+    db.collection<OwnerVerificationSession>("ownerVerificationSessions").createIndex({ userId: 1 }, { unique: true }),
+  ]).then(() => undefined).catch((error) => {
+    indexPromise = undefined;
+    throw error;
+  });
+  await indexPromise;
+  return db;
+}
+
+async function nextMongoId(db: Db, key: string) {
+  const result = await db.collection<Counter>("portfolioCounters").findOneAndUpdate(
+    { key },
+    { $inc: { value: 1 } },
+    { upsert: true, returnDocument: "after" },
+  );
+  if (!result) throw new Error("Unable to allocate a MongoDB document identifier.");
+  return result.value;
+}
+
+function nextTestId(key: string) {
+  const next = (testStore.counters.get(key) ?? 0) + 1;
+  testStore.counters.set(key, next);
+  return next;
+}
+
+function sortCaseStudies(items: CaseStudy[]) {
+  return items.sort((left, right) => left.sortOrder - right.sortOrder || left.id - right.id);
+}
+
+export function parseJson<T>(value: unknown, fallback: T): T {
+  if (typeof value !== "string") return fallback;
   try { return JSON.parse(value) as T; } catch { return fallback; }
 }
 
 export function isDuplicateEntry(error: unknown) {
-  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ER_DUP_ENTRY";
+  return (error instanceof MongoServerError && error.code === 11000)
+    || (typeof error === "object" && error !== null && "code" in error && (error as { code?: number }).code === 11000);
+}
+
+export function resetPortfolioTestStorage() {
+  if (!isTestRuntime()) return;
+  testStore.counters.clear();
+  testStore.users.clear();
+  testStore.settings.clear();
+  testStore.media.clear();
+  testStore.caseStudies.clear();
+  testStore.verificationSessions.clear();
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
-  const db = await getDb();
+  const now = new Date();
+  const updates: Partial<Pick<User, "name" | "email" | "loginMethod" | "role" | "lastSignedIn" | "updatedAt">> = {
+    lastSignedIn: user.lastSignedIn ?? now,
+    updatedAt: now,
+  };
+  if (user.name !== undefined) updates.name = user.name ?? null;
+  if (user.email !== undefined) updates.email = user.email ?? null;
+  if (user.loginMethod !== undefined) updates.loginMethod = user.loginMethod ?? null;
+  if (user.role) updates.role = user.role;
+
+  if (isTestRuntime()) {
+    const existing = testStore.users.get(user.openId);
+    testStore.users.set(user.openId, {
+      id: existing?.id ?? nextTestId("users"),
+      openId: user.openId,
+      name: existing?.name ?? null,
+      email: existing?.email ?? null,
+      loginMethod: existing?.loginMethod ?? null,
+      role: existing?.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "user"),
+      createdAt: existing?.createdAt ?? now,
+      lastSignedIn: user.lastSignedIn ?? now,
+      updatedAt: now,
+      ...updates,
+    });
+    return;
+  }
+
+  const db = await readyDb();
   if (!db) return;
-  const values: InsertUser = { openId: user.openId, lastSignedIn: user.lastSignedIn ?? new Date() };
-  const updateSet: Record<string, unknown> = { lastSignedIn: values.lastSignedIn };
-  (["name", "email", "loginMethod"] as const).forEach((field) => {
-    if (user[field] !== undefined) { values[field] = user[field] ?? null; updateSet[field] = user[field] ?? null; }
-  });
-  values.role = user.role ?? (user.openId === ENV.ownerOpenId ? "admin" : undefined);
-  if (values.role) updateSet.role = values.role;
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  const id = await nextMongoId(db, "users");
+  await db.collection<User>("users").updateOne(
+    { openId: user.openId },
+    {
+      $set: updates,
+      $setOnInsert: {
+        id,
+        openId: user.openId,
+        name: null,
+        email: null,
+        loginMethod: null,
+        role: user.openId === ENV.ownerOpenId ? "admin" : "user",
+        createdAt: now,
+      },
+    },
+    { upsert: true },
+  );
 }
 
 export async function getUserByOpenId(openId: string) {
-  const db = await getDb();
+  if (isTestRuntime()) return testStore.users.get(openId);
+  const db = await readyDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-  return result[0];
+  return (await db.collection<User>("users").findOne({ openId }, { projection: { _id: 0 } })) ?? undefined;
 }
 
 export async function getSetting<T>(key: string, fallback: T): Promise<T> {
-  const db = await getDb();
+  if (isTestRuntime()) return (testStore.settings.get(key)?.value as T | undefined) ?? fallback;
+  const db = await readyDb();
   if (!db) return fallback;
-  const result = await db.select().from(portfolioSettings).where(eq(portfolioSettings.key, key)).limit(1);
-  return result[0] ? parseJson(result[0].value, fallback) : fallback;
+  const setting = await db.collection<PortfolioSetting>("portfolioSettings").findOne({ key }, { projection: { _id: 0 } });
+  return (setting?.value as T | undefined) ?? fallback;
 }
 
 export async function getAllSettings() {
-  const db = await getDb();
-  return db ? db.select().from(portfolioSettings) : [];
+  if (isTestRuntime()) return Array.from(testStore.settings.values());
+  const db = await readyDb();
+  return db ? db.collection<PortfolioSetting>("portfolioSettings").find({}, { projection: { _id: 0 } }).toArray() : [];
 }
 
 export async function setSetting(key: string, value: unknown) {
-  const db = await getDb();
-  if (!db) throw new Error("Database is not available.");
-  await db.insert(portfolioSettings).values({ key, value: JSON.stringify(value) }).onDuplicateKeyUpdate({ set: { value: JSON.stringify(value) } });
+  const now = new Date();
+  if (isTestRuntime()) {
+    testStore.settings.set(key, { key, value, updatedAt: now });
+    return;
+  }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  await db.collection<PortfolioSetting>("portfolioSettings").updateOne({ key }, { $set: { value, updatedAt: now }, $setOnInsert: { key } }, { upsert: true });
 }
 
 export async function getCaseStudies(status?: "draft" | "published") {
-  const db = await getDb();
+  if (isTestRuntime()) return sortCaseStudies(Array.from(testStore.caseStudies.values()).filter((item) => !status || item.status === status));
+  const db = await readyDb();
   if (!db) return [] as CaseStudy[];
-  const query = db.select().from(caseStudies).orderBy(asc(caseStudies.sortOrder), asc(caseStudies.id));
-  return status ? query.where(eq(caseStudies.status, status)) : query;
+  return db.collection<CaseStudy>("caseStudies").find(status ? { status } : {}, { projection: { _id: 0 } }).sort({ sortOrder: 1, id: 1 }).toArray();
 }
 
-type CaseStudyValues = Omit<typeof caseStudies.$inferInsert, "id" | "createdAt" | "updatedAt">;
-
 export async function createCaseStudy(values: CaseStudyValues) {
-  const db = await getDb();
-  if (!db) throw new Error("Database is not available.");
-  const result = await db.insert(caseStudies).values(values);
-  return Number(result[0].insertId);
+  const now = new Date();
+  if (isTestRuntime()) {
+    if (Array.from(testStore.caseStudies.values()).some((item) => item.slug === values.slug)) throw { code: 11000 };
+    const id = nextTestId("caseStudies");
+    testStore.caseStudies.set(id, { id, ...values, createdAt: now, updatedAt: now });
+    return id;
+  }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  const id = await nextMongoId(db, "caseStudies");
+  await db.collection<CaseStudy>("caseStudies").insertOne({ id, ...values, createdAt: now, updatedAt: now });
+  return id;
 }
 
 export async function updateCaseStudy(id: number, values: CaseStudyValues) {
-  const db = await getDb();
-  if (!db) throw new Error("Database is not available.");
-  const result = await db.update(caseStudies).set(values).where(eq(caseStudies.id, id));
-  return result[0].affectedRows > 0;
+  const now = new Date();
+  if (isTestRuntime()) {
+    const existing = testStore.caseStudies.get(id);
+    if (!existing) return false;
+    if (Array.from(testStore.caseStudies.values()).some((item) => item.id !== id && item.slug === values.slug)) throw { code: 11000 };
+    testStore.caseStudies.set(id, { ...existing, ...values, updatedAt: now });
+    return true;
+  }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  return (await db.collection<CaseStudy>("caseStudies").updateOne({ id }, { $set: { ...values, updatedAt: now } })).matchedCount > 0;
 }
 
 export async function removeCaseStudy(id: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database is not available.");
-  await db.delete(caseStudies).where(eq(caseStudies.id, id));
+  if (isTestRuntime()) { testStore.caseStudies.delete(id); return; }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  await db.collection<CaseStudy>("caseStudies").deleteOne({ id });
 }
 
 export async function getMedia() {
-  const db = await getDb();
-  return db ? db.select().from(portfolioMedia).orderBy(asc(portfolioMedia.createdAt)) : [] as PortfolioMedia[];
+  if (isTestRuntime()) return Array.from(testStore.media.values()).sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+  const db = await readyDb();
+  return db ? db.collection<PortfolioMedia>("portfolioMedia").find({}, { projection: { _id: 0 } }).sort({ createdAt: 1 }).toArray() : [] as PortfolioMedia[];
 }
 
-type MediaValues = Omit<typeof portfolioMedia.$inferInsert, "id" | "createdAt" | "updatedAt">;
-
 export async function createMedia(values: MediaValues) {
-  const db = await getDb();
-  if (!db) throw new Error("Database is not available.");
-  const result = await db.insert(portfolioMedia).values(values);
-  return Number(result[0].insertId);
+  const now = new Date();
+  if (isTestRuntime()) {
+    if (Array.from(testStore.media.values()).some((item) => item.key === values.key)) throw { code: 11000 };
+    const id = nextTestId("portfolioMedia");
+    testStore.media.set(id, { id, ...values, createdAt: now, updatedAt: now });
+    return id;
+  }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  const id = await nextMongoId(db, "portfolioMedia");
+  await db.collection<PortfolioMedia>("portfolioMedia").insertOne({ id, ...values, createdAt: now, updatedAt: now });
+  return id;
 }
 
 export async function updateMedia(id: number, values: Pick<MediaValues, "altText" | "caption">) {
-  const db = await getDb();
-  if (!db) throw new Error("Database is not available.");
-  await db.update(portfolioMedia).set(values).where(eq(portfolioMedia.id, id));
+  const now = new Date();
+  if (isTestRuntime()) {
+    const existing = testStore.media.get(id);
+    if (existing) testStore.media.set(id, { ...existing, ...values, updatedAt: now });
+    return;
+  }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  await db.collection<PortfolioMedia>("portfolioMedia").updateOne({ id }, { $set: { ...values, updatedAt: now } });
 }
 
 export async function removeMedia(id: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database is not available.");
-  await db.delete(portfolioMedia).where(eq(portfolioMedia.id, id));
+  if (isTestRuntime()) { testStore.media.delete(id); return; }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  await db.collection<PortfolioMedia>("portfolioMedia").deleteOne({ id });
 }
 
 export async function getOwnerVerificationSession(userId: number) {
-  const db = await getDb();
+  if (isTestRuntime()) return testStore.verificationSessions.get(userId);
+  const db = await readyDb();
   if (!db) return undefined;
-  const result = await db.select().from(ownerVerificationSessions).where(eq(ownerVerificationSessions.userId, userId)).limit(1);
-  return result[0];
+  return (await db.collection<OwnerVerificationSession>("ownerVerificationSessions").findOne({ userId }, { projection: { _id: 0 } })) ?? undefined;
 }
 
 export async function markOwnerVerified(userId: number, expiresAt: Date) {
-  const db = await getDb();
-  if (!db) throw new Error("Database is not available.");
-  await db.insert(ownerVerificationSessions).values({ userId, expiresAt }).onDuplicateKeyUpdate({
-    set: { verifiedAt: new Date(), expiresAt },
-  });
+  const now = new Date();
+  if (isTestRuntime()) {
+    const existing = testStore.verificationSessions.get(userId);
+    testStore.verificationSessions.set(userId, { id: existing?.id ?? nextTestId("ownerVerificationSessions"), userId, verifiedAt: now, expiresAt, updatedAt: now });
+    return;
+  }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  const id = await nextMongoId(db, "ownerVerificationSessions");
+  await db.collection<OwnerVerificationSession>("ownerVerificationSessions").updateOne(
+    { userId },
+    { $set: { verifiedAt: now, expiresAt, updatedAt: now }, $setOnInsert: { id, userId } },
+    { upsert: true },
+  );
 }
 
 export async function clearOwnerVerification(userId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database is not available.");
-  await db.delete(ownerVerificationSessions).where(eq(ownerVerificationSessions.userId, userId));
+  if (isTestRuntime()) { testStore.verificationSessions.delete(userId); return; }
+  const db = await readyDb();
+  if (!db) throw new Error("MongoDB is not available.");
+  await db.collection<OwnerVerificationSession>("ownerVerificationSessions").deleteOne({ userId });
 }

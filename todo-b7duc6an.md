@@ -46,5 +46,19 @@
 - [x] Confirm that the first repository token passes a REST read-permission check but is rejected by Git push.
 - [x] Verify the currently configured GitHub export credential has Git-over-HTTPS write access to `sanivirani/Portfolio`.
 - [x] Export the Vercel-ready project to the selected GitHub repository.
-- [ ] Checkpoint the GitHub credential-validation test and synchronize the resulting latest commit to `sanivirani/Portfolio`.
-- [ ] Verify the synchronized repository export and provide the Vercel import handoff.
+- [x] Checkpoint the GitHub credential-validation test and synchronize the resulting latest commit to `sanivirani/Portfolio`.
+- [x] Verify the synchronized repository export and provide the Vercel import handoff.
+- [x] Provide the verified GitHub repository URL and explain the remaining Vercel import or reconnection step.
+- [x] Inspect the connected Vercel account and confirm the available Portfolio import path.
+- [ ] Create or reconnect the Vercel project to `sanivirani/Portfolio` with the checked-in serverless configuration.
+- [ ] Configure the required production environment variables, database connection, and OAuth callback before deployment.
+- [ ] Deploy, verify API and public-site behavior, and provide the Vercel production URL.
+- [x] Assess replacing the current MySQL/TiDB and Drizzle data layer with MongoDB for Vercel deployment.
+- [x] Confirm whether to retain the current relational backend or approve a MongoDB migration before Vercel deployment.
+- [ ] If approved, configure MongoDB connectivity, migrate portfolio persistence, and update the Vercel environment requirements.
+- [x] Replace the Drizzle MySQL database helpers with a Vercel-safe cached MongoDB Atlas client and equivalent typed collection operations.
+- [x] Convert users, portfolio settings, media, case studies, and owner-verification persistence to MongoDB collections while preserving tRPC response contracts.
+- [x] Replace MySQL-specific tests, schema references, and Vercel instructions with MongoDB Atlas validation and setup guidance.
+- [ ] Configure `MONGODB_URI` and the remaining production variables in Vercel after the MongoDB Atlas cluster is ready.
+- [ ] Complete the remaining Vercel import-form setup and explicitly confirm the project creation or reconnection state.
+- [ ] After the Vercel project exists, verify the import settings match the checked-in contract: Vite, root `./`, build `pnpm build:client`, and output `dist/public`.

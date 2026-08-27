@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
+import { beforeEach } from "vitest";
+import * as db from "./db";
 import type { TrpcContext } from "./_core/context";
 
 function createAnonymousContext(): TrpcContext {
@@ -29,6 +31,8 @@ function createAdminContext(id = 1): TrpcContext {
 }
 
 describe("portfolio admin router", () => {
+  beforeEach(() => db.resetPortfolioTestStorage());
+
   it("rejects anonymous requests to the portfolio control center", async () => {
     const caller = appRouter.createCaller(createAnonymousContext());
     await expect(caller.portfolio.admin.overview()).rejects.toMatchObject({ code: "FORBIDDEN" });

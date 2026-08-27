@@ -18,7 +18,8 @@ The repository intentionally does not include a committed `.env.example`, becaus
 
 | Variable | Required | Where it is used | Vercel value guidance |
 |---|---:|---|---|
-| `DATABASE_URL` | Yes | Drizzle + `mysql2` data access | Use a public, TLS-enabled **MySQL-compatible** database URL. |
+| `MONGODB_URI` | Yes | Cached MongoDB Atlas client and Content Studio collections | Use the Atlas `mongodb+srv://…` connection URI. Add it as a secret, never in the browser bundle. |
+| `MONGODB_DB` | No | MongoDB database selection | Defaults to the database in `MONGODB_URI`, or `sani_portfolio` when no database name is present. |
 | `JWT_SECRET` | Yes | Session signing and verification | Generate a long random secret; use the same value for all Production instances. |
 | `VITE_APP_ID` | Yes | Browser OAuth login start | OAuth application identifier. This value is visible in the client bundle. |
 | `VITE_OAUTH_PORTAL_URL` | Yes | Browser OAuth login start | OAuth portal base URL, without a trailing callback path. This value is visible in the client bundle. |
@@ -29,20 +30,21 @@ The repository intentionally does not include a committed `.env.example`, becaus
 
 `VITE_*` variables are compiled into the browser build, so they must never contain database credentials, API keys, or other secrets. Vercel supports separate Local, Preview, and Production variable values; use a non-production database for Preview whenever possible.[2] [3]
 
-## 3. Configure a database
+## 3. Configure MongoDB Atlas
 
-The repository uses `drizzle-orm/mysql2`, so select a MySQL-compatible provider such as PlanetScale, TiDB Cloud, Amazon RDS for MySQL, or another managed MySQL service that accepts internet traffic from Vercel. **Do not use Vercel Postgres without migrating the schema and replacing `mysql2`.**
+This repository uses the official MongoDB Node.js driver with a cached client that can be reused by warm Vercel Function instances. It creates the required unique indexes on first use and stores CMS data in the following collections: `users`, `portfolioSettings`, `portfolioMedia`, `caseStudies`, `ownerVerificationSessions`, and internal `portfolioCounters`. No database migration command is run during the Vercel build.
 
-Create an empty database, obtain its TLS-enabled connection URI, and set it as `DATABASE_URL`. Apply schema changes outside the Vercel build step so a build never performs an unexpected migration:
+### Recommended: create Atlas through Vercel
 
-```bash
-pnpm install
-export DATABASE_URL='your-production-mysql-connection-uri'
-pnpm drizzle-kit generate
-pnpm drizzle-kit migrate
-```
+In the [Vercel Marketplace](https://vercel.com/marketplace/mongodbatlas/atlas), install **MongoDB Atlas** for the Vercel team that owns this project. Create a cluster, select a region close to the intended Vercel function region, and connect the resulting Atlas resource to this Portfolio project. The native integration adds `MONGODB_URI` to the selected Vercel environments automatically.[5]
 
-For Preview deployments, use a separate Preview database or a branch/database feature from the chosen provider. Verify that the provider permits connections from Vercel's network and requires TLS where supported.
+For this portfolio, an Atlas Free cluster is sufficient for initial Content Studio use. Connect the resource to both Production and Preview only if Preview should persist editable CMS changes; otherwise, connect it to Production and configure a separate preview database later.
+
+### Alternative: connect an existing Atlas cluster
+
+Create a database user with `readWrite` access to the selected portfolio database, such as `sani_portfolio`. Copy the **Drivers → Node.js** connection string, replace its placeholders locally, and add the completed URI in Vercel as the `MONGODB_URI` secret for Production and Preview. Do not paste it into source code, GitHub issues, or chat.
+
+Vercel Functions use dynamic outbound IP addresses. When you connect Atlas directly, configure an Atlas IP Access List rule that permits Vercel connectivity. MongoDB documents that the Vercel integration uses `0.0.0.0/0` because of these dynamic addresses; this permits connections from anywhere, so use strong, unique database credentials and grant only the minimum database role.[5] [6]
 
 ## 4. Configure OAuth before enabling Content Studio
 
@@ -99,3 +101,5 @@ Then confirm `http://localhost:3101/api/oauth/callback` returns the application'
 [2]: https://vercel.com/docs/deployments/environments "Vercel deployment environments"
 [3]: https://vercel.com/docs/environment-variables "Vercel environment variables"
 [4]: https://vercel.com/docs/frameworks/frontend/vite "Vite on Vercel"
+[5]: https://www.mongodb.com/docs/atlas/reference/partner-integrations/vercel/ "MongoDB Atlas: Integrate with Vercel"
+[6]: https://www.mongodb.com/docs/atlas/security/ip-access-list/ "MongoDB Atlas: Configure IP Access List Entries"

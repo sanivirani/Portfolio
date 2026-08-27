@@ -20,7 +20,7 @@ describe("Vercel deployment configuration", () => {
   it("documents the external database, OAuth callback, and required production variables", async () => {
     const guide = await readFile(new URL("../VERCEL_DEPLOYMENT.md", import.meta.url), "utf8");
 
-    expect(guide).toContain("DATABASE_URL");
+    expect(guide).toContain("MONGODB_URI");
     expect(guide).toContain("JWT_SECRET");
     expect(guide).toContain("/api/oauth/callback");
     expect(guide).toContain("Manus Forge storage");
