@@ -2,7 +2,10 @@ import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
-import vercelApi from "../api/[...path]";
+
+const vercelApiPromise = import(new URL("../api/[...path].mjs", import.meta.url).href) as Promise<{
+  default: Parameters<typeof createServer>[0];
+}>;
 
 describe("Vercel deployment configuration", () => {
   it("builds the client output, retains API function routing, and keeps SPA deep links available", async () => {
@@ -10,8 +13,9 @@ describe("Vercel deployment configuration", () => {
 
     expect(config.buildCommand).toBe("pnpm build:client");
     expect(config.outputDirectory).toBe("dist/public");
-    expect(config.functions["api/[...path].ts"].maxDuration).toBe(30);
+    expect(config.functions["api/[...path].mjs"].maxDuration).toBe(30);
     expect(config.rewrites).toEqual(expect.arrayContaining([
+      expect.objectContaining({ source: "/api/:path*", destination: "/api/[...path].mjs" }),
       expect.objectContaining({ source: "/:path((?!api/).*)", destination: "/index.html" }),
       expect.objectContaining({ source: "/manus-storage/:path*" }),
     ]));
@@ -27,6 +31,7 @@ describe("Vercel deployment configuration", () => {
   });
 
   it("exposes the Vercel default export as an HTTP application for /api routes", async () => {
+    const vercelApi = (await vercelApiPromise).default;
     const server = createServer(vercelApi);
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
 
@@ -43,6 +48,7 @@ describe("Vercel deployment configuration", () => {
 
   it("serves the SPA entry document for a client-side deep link without consuming API paths", async () => {
     const html = await readFile(new URL("../client/index.html", import.meta.url), "utf8");
+    const vercelApi = (await vercelApiPromise).default;
     const server = createServer((request, response) => {
       if (request.url?.startsWith("/api/")) {
         vercelApi(request, response);

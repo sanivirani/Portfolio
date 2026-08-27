@@ -1,12 +1,12 @@
 # Vercel Deployment Guide
 
-This repository now has a Vercel-ready build configuration. It separates the Vite client build from the Express application and exports a single serverless entrypoint for the existing same-origin API endpoints. The configured fallback excludes `/api/*` so API requests reach the Vercel Function, while client-side routes such as `/admin` resolve to the Vite application after a refresh.
+This repository now has a Vercel-ready build configuration. It separates the Vite client build from the Express application and emits a self-contained serverless ESM entrypoint at `api/[...path].mjs` for the existing same-origin API endpoints. The configured fallback excludes `/api/*` so API requests reach the Vercel Function, while client-side routes such as `/admin` resolve to the Vite application after a refresh.
 
 > **Important:** The current Manus deployment remains the recommended live environment until the external database, OAuth callback, and media migration steps below are complete. The project currently uses Manus services for its published media and OAuth integration.
 
 ## 1. Import the repository
 
-Export the project to GitHub from Manus, then import the repository in the [Vercel dashboard](https://vercel.com/new). Vercel will use the repository's `vercel.json`, run `pnpm build:client`, publish `dist/public`, and expose the Express application from the catch-all `/api/*` function. Vercel supports default-exported Express applications as Functions, while static files must be served from the deployment output rather than `express.static()`.[1]
+Export the project to GitHub from Manus, then import the repository in the [Vercel dashboard](https://vercel.com/new). Vercel will use the repository's `vercel.json`, run `pnpm build:client`, publish `dist/public`, and expose the Express application from the generated catch-all `/api/*` function. The build regenerates this self-contained ESM function so runtime code does not depend on extensionless imports outside `api/`. Vercel supports default-exported Express applications as Functions, while static files must be served from the deployment output rather than `express.static()`.[1]
 
 The first Vercel deployment becomes Production; later pushes to the production branch deploy to Production, while other branches create Preview deployments.[2]
 

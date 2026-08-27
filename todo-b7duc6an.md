@@ -62,3 +62,5 @@
 - [ ] Configure `MONGODB_URI` and the remaining production variables in Vercel after the MongoDB Atlas cluster is ready.
 - [ ] Complete the remaining Vercel import-form setup and explicitly confirm the project creation or reconnection state.
 - [ ] After the Vercel project exists, verify the import settings match the checked-in contract: Vite, root `./`, build `pnpm build:client`, and output `dist/public`.
+- [ ] Diagnose and correct the Vercel deployment so `/api/oauth/callback` is served by the serverless Express function instead of returning `404 NOT_FOUND`.
+- [ ] Redeploy the corrected serverless routing configuration and verify the deployed API callback returns the expected 400 JSON validation response.
