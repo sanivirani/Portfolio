@@ -72,4 +72,24 @@ describe("MongoDB portfolio persistence contract", () => {
       expect.objectContaining({ loginMethod: "github", role: "admin" }),
     );
   });
+
+  it("does not assign caller-provided profile fields in both MongoDB update operators", () => {
+    const now = new Date("2026-08-27T00:00:00.000Z");
+    const { mongoUpdate } = db.buildUserUpsertUpdate({
+      openId: "github:103173775",
+      name: "Sani Virani",
+      email: null,
+      loginMethod: "github",
+      role: "admin",
+    }, 42, now);
+
+    for (const key of Object.keys(mongoUpdate.$set)) {
+      expect(Object.prototype.hasOwnProperty.call(mongoUpdate.$setOnInsert, key)).toBe(false);
+    }
+    expect(mongoUpdate.$setOnInsert).toEqual({
+      id: 42,
+      openId: "github:103173775",
+      createdAt: now,
+    });
+  });
 });

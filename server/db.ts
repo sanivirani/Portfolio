@@ -180,9 +180,8 @@ export function resetPortfolioTestStorage() {
   testStore.verificationSessions.clear();
 }
 
-export async function upsertUser(user: InsertUser): Promise<void> {
+export function buildUserUpsertUpdate(user: InsertUser, id: number, now: Date) {
   if (!user.openId) throw new Error("User openId is required for upsert");
-  const now = new Date();
   const updates: Partial<Pick<User, "name" | "email" | "loginMethod" | "role" | "lastSignedIn" | "updatedAt">> = {
     lastSignedIn: user.lastSignedIn ?? now,
     updatedAt: now,
@@ -192,7 +191,31 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   if (user.loginMethod !== undefined) updates.loginMethod = user.loginMethod ?? null;
   if (user.role) updates.role = user.role;
 
+  // MongoDB rejects an update when a path appears in both `$set` and
+  // `$setOnInsert`. Add nullable/default fields only when `$set` does not
+  // already carry a caller-provided value for that field.
+  const insertDefaults: Partial<User> = {
+    id,
+    openId: user.openId,
+    createdAt: now,
+  };
+  if (updates.name === undefined) insertDefaults.name = null;
+  if (updates.email === undefined) insertDefaults.email = null;
+  if (updates.loginMethod === undefined) insertDefaults.loginMethod = null;
+  if (updates.role === undefined) {
+    insertDefaults.role = user.openId === ENV.ownerOpenId ? "admin" : "user";
+  }
+
+  return { updates, mongoUpdate: { $set: updates, $setOnInsert: insertDefaults } };
+}
+
+export async function upsertUser(user: InsertUser): Promise<void> {
+  if (!user.openId) throw new Error("User openId is required for upsert");
+  const now = new Date();
+
   if (isTestRuntime()) {
+    const id = nextTestId("users");
+    const { updates } = buildUserUpsertUpdate(user, id, now);
     const existing = testStore.users.get(user.openId);
     testStore.users.set(user.openId, {
       id: existing?.id ?? nextTestId("users"),
@@ -211,21 +234,11 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
   const db = await readyDb();
   if (!db) return;
-  const id = await nextMongoId(db, "users");
+  const mongoId = await nextMongoId(db, "users");
+  const update = buildUserUpsertUpdate(user, mongoId, now);
   await db.collection<User>("users").updateOne(
     { openId: user.openId },
-    {
-      $set: updates,
-      $setOnInsert: {
-        id,
-        openId: user.openId,
-        name: null,
-        email: null,
-        loginMethod: null,
-        role: user.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "user"),
-        createdAt: now,
-      },
-    },
+    update.mongoUpdate,
     { upsert: true },
   );
 }

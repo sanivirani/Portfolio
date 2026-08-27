@@ -77,3 +77,5 @@
 - [x] Create a GitHub OAuth application, register the Vercel production callback, and add the resulting client configuration to Vercel without committing secrets.
 - [ ] Rotate the currently exposed GitHub OAuth client secret and JWT secret, then securely replace their Vercel Production values before deployment.
 - [ ] Document that GitHub OAuth remains intentionally unconfigured for Preview until a stable Preview callback URL is selected.
+- [ ] Diagnose the live GitHub OAuth callback error that occurred after user authorization and identify whether the rotated Vercel secret or server implementation is at fault.
+- [ ] Correct the live GitHub OAuth callback failure, redeploy, and verify that the authorized administrator returns to `/admin` with an active session.
