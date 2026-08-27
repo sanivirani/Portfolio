@@ -81,4 +81,4 @@
 - [x] Correct the live GitHub OAuth callback failure, redeploy, and verify that the authorized administrator returns to `/admin` with an active session.
 - [x] Diagnose why the Manus preview Content Studio link uses an OAuth-unconfigured same-origin domain instead of the Vercel Production deployment.
 - [x] Route Manus preview Content Studio entry points to the configured Vercel Production Content Studio URL without changing Vercel’s same-origin OAuth callback.
-- [ ] Validate the Manus preview link, Vercel production sign-in entry point, public-site behavior, and publish the correction.
+- [x] Validate the Manus preview link, Vercel production sign-in entry point, public-site behavior, and publish the correction.
