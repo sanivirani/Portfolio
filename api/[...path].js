@@ -65962,7 +65962,8 @@ function contentStudioLoginHrefForOrigin(origin2) {
 function requestOrigin(req) {
   const forwardedProto = req.headers["x-forwarded-proto"];
   const protocol = typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() : req.protocol;
-  const host = req.get("host");
+  const forwardedHost = req.headers["x-forwarded-host"];
+  const host = typeof forwardedHost === "string" ? forwardedHost.split(",")[0].trim() : req.get("host");
   return host ? `${protocol}://${host}` : "";
 }
 function githubCallbackUrl(origin2) {

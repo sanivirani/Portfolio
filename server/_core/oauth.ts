@@ -16,12 +16,15 @@ type GitHubUser = {
   email?: string | null;
 };
 
-function requestOrigin(req: Request) {
+export function requestOrigin(req: Request) {
   const forwardedProto = req.headers["x-forwarded-proto"];
   const protocol = typeof forwardedProto === "string"
     ? forwardedProto.split(",")[0].trim()
     : req.protocol;
-  const host = req.get("host");
+  const forwardedHost = req.headers["x-forwarded-host"];
+  const host = typeof forwardedHost === "string"
+    ? forwardedHost.split(",")[0].trim()
+    : req.get("host");
   return host ? `${protocol}://${host}` : "";
 }
 
